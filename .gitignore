@@ -1,0 +1,55 @@
+# === Node.js (Cloud Function) ===
+functions/**/node_modules/
+functions/**/.env
+functions/**/.env.*
+functions/**/package-lock.json
+functions/**/dist/
+functions/**/build/
+functions/**/.next/
+functions/**/.cache/
+functions/**/.tsbuildinfo
+functions/**/coverage/
+
+# === Terraform ===
+.tfstate
+.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.json
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# local .tmp builds for archive_file
+tf/.tmp/
+functions/.tmp/
+
+# === OS / Editor ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# === Logs / Temp ===
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+tmp/
+*.tmp
+*.bak
+
+# === Archives / Builds ===
+*.zip
+*.tar.gz
+*.tgz
+
+# === Cloud Function Upload Buckets (if synced locally) ===
+*-fn-src/
+*-function-build/
