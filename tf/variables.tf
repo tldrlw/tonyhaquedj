@@ -14,3 +14,7 @@ variable "impersonate_service_account" {
   description = "Service account Terraform should impersonate"
   type        = string
 }
+
+variable "func_name" {
+  default = "main"
+}

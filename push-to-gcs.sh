@@ -5,7 +5,7 @@ set -euo pipefail
 PROJECT_ID="dulcet-provider-474401-d3"
 REGION="us-central1"
 BUCKET="chunes-${PROJECT_ID}-${REGION}"
-SRC_DIR="$HOME/Desktop/chunes"
+SRC_DIR="$HOME/Desktop/chunes-temp"
 LOG_FILE="./push-to-gcs.log"
 
 # Optional flags
