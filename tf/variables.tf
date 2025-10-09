@@ -15,4 +15,5 @@ variable "impersonate_service_account" {
 
 variable "func_name" {
   default = "main"
+  type    = string
 }
