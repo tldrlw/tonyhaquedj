@@ -5,7 +5,7 @@ set -euo pipefail
 PROJECT_ID="dulcet-provider-474401-d3"
 REGION="us-central1"
 BUCKET="chunes-${PROJECT_ID}-${REGION}"
-LOG_FILE="./empty-gcs-bucket.log"
+LOG_FILE="./empty-gcs.log"
 # Optional flags
 DRY_RUN=false     # true = preview deletions, no actual delete
 # ==========================
