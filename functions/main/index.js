@@ -1,12 +1,28 @@
-// functions/main/index.js
 import { BigQuery } from "@google-cloud/bigquery";
+import { Storage } from "@google-cloud/storage";
 import { parseBeatportFilename } from "./beatport-filename.js";
 
 const bigquery = new BigQuery();
+const storage = new Storage();
+
 const DATASET = process.env.BQ_DATASET || "chunes";
 const TABLE = process.env.BQ_TABLE || "tracks";
+const FORCE_METADATA_SIZE =
+  (process.env.FORCE_METADATA_SIZE || "false").toLowerCase() === "true";
 
-/* ---------------- utils: safe stringify + logging ---------------- */
+// unmistakable cold-start banner
+console.log(
+  JSON.stringify({
+    severity: "INFO",
+    message: "Cold start: function boot",
+    dataset: DATASET,
+    table: TABLE,
+    forceMetadataSize: FORCE_METADATA_SIZE,
+    ts: new Date().toISOString(),
+  })
+);
+
+/* ---------------- utils ---------------- */
 function safe(v) {
   try {
     if (v instanceof Error) {
@@ -22,11 +38,10 @@ function safe(v) {
     }
   }
 }
-
 function log(level, message, extra = {}) {
   const rec = { severity: level.toUpperCase(), message, ...extra };
   try {
-    console[level]?.(safe(rec)); // structured (great for Log Explorer filters)
+    console[level]?.(safe(rec));
   } catch {
     console[level]?.(
       JSON.stringify({ severity: level.toUpperCase(), message })
@@ -78,9 +93,60 @@ const toInt = (v) => {
 const toTimestamp = (v) => {
   if (!v) return null;
   const d = new Date(v);
-  return Number.isFinite(d.valueOf()) ? d.toISOString() : null; // RFC3339 OK for BQ TIMESTAMP
+  return Number.isFinite(d.valueOf()) ? d.toISOString() : null;
 };
 const toStr = (v) => (v == null ? null : String(v));
+
+async function resolveBytes({ bucket, name, sizeFromEvent }) {
+  log("info", "resolveBytes:enter", { bucket, name, sizeFromEvent });
+
+  // Only trust the event size if it is actually present (not null/undefined/"")
+  const hasEventSize =
+    sizeFromEvent !== undefined &&
+    sizeFromEvent !== null &&
+    sizeFromEvent !== "";
+
+  if (hasEventSize) {
+    const n = Number(sizeFromEvent);
+    if (Number.isFinite(n) && n >= 0) {
+      log("info", "resolveBytes:usingEventSize", { bytes: n });
+      return n;
+    }
+    log("warning", "resolveBytes:eventSizeUnusable", { sizeFromEvent });
+  } else {
+    log("info", "resolveBytes:noEventSizePresent");
+  }
+
+  // Fallback to GCS metadata
+  try {
+    const file = storage.bucket(bucket).file(name);
+    const [exists] = await file.exists();
+    log("info", "resolveBytes:file.exists()", { exists });
+
+    if (!exists) {
+      log("warning", "resolveBytes:fileNotFound", { bucket, name });
+      return null;
+    }
+
+    const [meta] = await file.getMetadata();
+    const m = Number(meta?.size);
+    log("info", "resolveBytes:fetchedMetadata", {
+      metaSize: meta?.size,
+      contentType: meta?.contentType,
+      storageClass: meta?.storageClass,
+      updated: meta?.updated,
+    });
+
+    if (Number.isFinite(m) && m >= 0) return m;
+    return null;
+  } catch (e) {
+    log("error", "resolveBytes:metadataFetchFailed", {
+      error: e?.message || String(e),
+      code: e?.code,
+    });
+    return null;
+  }
+}
 
 /* ---------------- BQ helpers ---------------- */
 async function getTable() {
@@ -126,8 +192,7 @@ async function getTable() {
 async function processObject({
   bucket,
   name: objectName,
-  size,
-  contentType,
+  sizeBytes,
   generation,
   insertId,
 }) {
@@ -137,7 +202,7 @@ async function processObject({
   }
 
   if (!/\.(mp3|wav|aiff|flac|m4a|aac|ogg)$/i.test(objectName)) {
-    log("info", "Skipping non-audio object", { objectName, contentType });
+    log("info", "Skipping non-audio object", { objectName });
     return { skipped: true, reason: "non-audio", objectName };
   }
 
@@ -152,11 +217,10 @@ async function processObject({
   }
   log("info", "Parsed filename", { objectName, parsedPreview: parsed });
 
-  // normalize to match BQ schema
   const normalized = {
     track_id: toInt(parsed.track_id),
     track_name: toStr(parsed.track_name),
-    artists: toStr(parsed.artists), // schema is STRING (not REPEATED)
+    artists: toStr(parsed.artists),
     mix_name: toStr(parsed.mix_name),
     bpm: toInt(parsed.bpm),
     musical_key: toStr(parsed.musical_key),
@@ -167,12 +231,16 @@ async function processObject({
     file_ext: toStr(parsed.file_ext),
   };
 
+  // Convert BYTES → MB (2 decimals) — allow 0-byte files to become 0.0
+  const bytes = Number.isFinite(sizeBytes) ? sizeBytes : null;
+  const sizeMB =
+    bytes === null ? null : Number((bytes / (1024 * 1024)).toFixed(2));
+
   const row = {
     gcs_bucket: toStr(bucket),
     gcs_object: toStr(objectName),
-    gcs_generation: toStr(generation || null), // your schema includes this ✅
-    size_bytes: size ? toInt(size) : null,
-    content_type: toStr(contentType || null),
+    gcs_generation: toStr(generation || null),
+    size: sizeMB,
     ...normalized,
     ingested_at: new Date().toISOString(),
   };
@@ -180,31 +248,26 @@ async function processObject({
   const preview = Object.fromEntries(Object.entries(row).slice(0, 12));
   log("info", "Prepared BQ row (preview)", {
     insertId: insertId || objectName,
-    rowKeys: Object.keys(row),
     preview,
   });
 
   const table = await getTable();
-
   const rows = [{ insertId: insertId || objectName, json: row }];
 
   try {
-    log("info", "Inserting row to BigQuery (raw response on)", {
+    log("info", "Inserting row to BigQuery (raw)", {
       dataset: DATASET,
       table: TABLE,
-      rowsCount: rows.length,
     });
-
     const t0 = Date.now();
     const [resp] = await table.insert(rows, {
-      raw: true, // return insertAll API response
-      skipInvalidRows: false, // fail loudly on bad rows
-      ignoreUnknownValues: false, // we expect schema to match
+      raw: true,
+      skipInvalidRows: false,
+      ignoreUnknownValues: false,
     });
 
     log("info", "BQ insert completed", {
       elapsedMs: Date.now() - t0,
-      hasResponse: !!resp,
       hasInsertErrors: !!resp?.insertErrors?.length,
     });
 
@@ -219,7 +282,7 @@ async function processObject({
       };
     }
 
-    log("info", "Inserted row to BigQuery", { objectName });
+    log("info", "Inserted row to BigQuery", { objectName, sizeMB });
     return { inserted: true, row };
   } catch (err) {
     const isPartial =
@@ -228,7 +291,7 @@ async function processObject({
       const perRow = (err.errors || []).map((e, idx) => ({
         index: idx,
         rowKeys: Object.keys(e.row || {}),
-        errors: e.errors, // [{message, reason, location}]
+        errors: e.errors,
       }));
       log("error", "BigQuery partial failure", {
         message: err.message,
@@ -278,23 +341,19 @@ export async function handleGcsFinalize(cloudEvent) {
     generation = generation || fromId.generation;
   }
 
-  const size = d.size ?? d.contentLength ?? null;
-  const contentType = d.contentType ?? d.mimeType ?? null;
+  const rawSize = d.size ?? d.contentLength ?? null;
   const insertId = cloudEvent?.id || `${name}:${generation}` || name;
 
-  log("info", "Resolved event fields", {
-    bucket,
-    name,
-    generation,
-    size,
-    contentType,
-  });
+  log("info", "Resolved event fields", { bucket, name, generation, rawSize });
+
+  // Ensure numeric bytes (prefer event, optionally force metadata)
+  const bytes = await resolveBytes({ bucket, name, sizeFromEvent: rawSize });
+  log("info", "Size resolution result", { bucket, name, bytes });
 
   const result = await processObject({
     bucket,
     name,
-    size,
-    contentType,
+    sizeBytes: bytes, // number (bytes) or null
     generation,
     insertId,
   });
@@ -317,16 +376,14 @@ export async function manualIngest(req, res) {
       bucket,
       name,
       size = null,
-      contentType = null,
       insertId = null,
       generation = null,
     } = req.body || {};
-    log("info", "Manual ingest request", { bucket, name, generation });
+    log("info", "Manual ingest request", { bucket, name, generation, size });
     const result = await processObject({
       bucket,
       name,
-      size,
-      contentType,
+      sizeBytes: size,
       insertId,
       generation,
     });

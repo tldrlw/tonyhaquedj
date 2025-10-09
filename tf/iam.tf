@@ -90,3 +90,9 @@ resource "google_cloud_run_service_iam_member" "eventarc_invoker_run" {
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.eventarc_invoker.email}"
 }
+
+resource "google_storage_bucket_iam_member" "fn_can_read_objects" {
+  bucket = google_storage_bucket.chunes.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.fn_sa.email}"
+}

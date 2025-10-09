@@ -25,9 +25,8 @@ resource "google_bigquery_table" "tracks" {
   schema = jsonencode([
     { "name" : "gcs_bucket", "type" : "STRING", "mode" : "REQUIRED" },
     { "name" : "gcs_object", "type" : "STRING", "mode" : "REQUIRED" },
-    { "name" : "gcs_generation", "type" : "STRING", "mode" : "NULLABLE", "description" : "GCS object generation" },
-    { "name" : "size_bytes", "type" : "INT64", "mode" : "NULLABLE" },
-    { "name" : "content_type", "type" : "STRING", "mode" : "NULLABLE" },
+    { "name" : "gcs_generation", "type" : "STRING", "mode" : "NULLABLE" },
+    { "name" : "size", "type" : "FLOAT64", "mode" : "NULLABLE", "description" : "File size in megabytes" },
     { "name" : "track_id", "type" : "INT64", "mode" : "NULLABLE" },
     { "name" : "track_name", "type" : "STRING", "mode" : "NULLABLE" },
     { "name" : "artists", "type" : "STRING", "mode" : "NULLABLE" },

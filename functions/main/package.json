@@ -1,15 +1,18 @@
 {
   "name": "main",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "description": "GCS → CFv2 → BigQuery ingester",
+  "private": true,
+  "type": "module",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "engines": {
+    "node": ">=20"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "scripts": {
+    "test": "echo \"No tests\" && exit 0"
+  },
   "dependencies": {
-    "@google-cloud/bigquery": "^8.1.1"
+    "@google-cloud/bigquery": "^8.1.1",
+    "@google-cloud/storage": "^7.13.0"
   }
 }
