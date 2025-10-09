@@ -1,7 +1,14 @@
 // functions/main/beatport-filename.js
 import path from "node:path";
 
+/**
+ * Camelot Wheel lookup by normalized key:
+ * Majors: "C", "F#", "Bb", ...
+ * Minors: "Am", "F#m", "Bbm", ...
+ * (We prefer flat spellings where Camelot commonly does.)
+ */
 const keyToCamelot = {
+  // Minor (A)
   Abm: "1A",
   Ebm: "2A",
   Bbm: "3A",
@@ -14,6 +21,8 @@ const keyToCamelot = {
   Bm: "10A",
   "F#m": "11A",
   "C#m": "12A",
+
+  // Major (B)
   B: "1B",
   "F#": "2B",
   Db: "3B",
@@ -28,16 +37,34 @@ const keyToCamelot = {
   E: "12B",
 };
 
-/** Turn "E-Minor" | "C-Major" → "Em" | "C" */
-export function normalizeKey(raw) {
-  if (!raw) return null;
-  const t = raw.replace(/_/g, "'").trim(); // restore apostrophes if any
-  const m = t.match(/^([A-G](?:#|b)?)[-\s_]*(Major|Minor)$/i);
-  if (!m) return t;
-  const root = m[1].toUpperCase();
-  const qual = m[2].toLowerCase() === "minor" ? "m" : "";
-  return `${root}${qual}`;
-}
+/**
+ * Enharmonic equivalents used as a fallback when direct lookup misses.
+ * Includes rare/theoretical forms to be bullet-proof.
+ */
+const enharmonicMap = {
+  // Major
+  "A#": "Bb",
+  "D#": "Eb",
+  "G#": "Ab",
+  "C#": "Db", // extra coverage (we prefer Db for Camelot 3B)
+  Db: "C#",
+  Gb: "F#",
+  Cb: "B",
+  Fb: "E",
+  "E#": "F",
+  "B#": "C",
+
+  // Minor
+  "A#m": "Bbm",
+  "D#m": "Ebm",
+  "G#m": "Abm",
+  Dbm: "C#m",
+  Gbm: "F#m",
+  Cbm: "Bm",
+  Fbm: "Em",
+  "E#m": "Fm",
+  "B#m": "Cm",
+};
 
 /** Can_t → Can't (only when _ is between alphanumerics) */
 function restoreApostrophes(s) {
@@ -67,7 +94,55 @@ function toIsoDate(s) {
   return Number.isNaN(+dt) ? null : dt.toISOString();
 }
 
-/** Template:
+/**
+ * Normalize musical key into:
+ *   Majors: "C", "F#", "Bb", ...
+ *   Minors: "Am", "F#m", "Bbm", ...
+ *
+ * Accepts:
+ *   - "E-Minor", "C-Major", "Ab Minor", "F#   Major"
+ *   - "Em", "C", "Abm", "F#"
+ *   - Unicode accidentals (♭/♯) are converted to b/#.
+ */
+export function normalizeKey(raw) {
+  if (!raw) return null;
+
+  // Restore apostrophes, trim, and normalize accidentals.
+  const t0 = raw.replace(/_/g, "'").trim();
+  const t = t0.replace(/\u266D/g, "b").replace(/\u266F/g, "#"); // ♭ → b, ♯ → #
+
+  // 1) Full form: Letter + optional accidental + "Major|Minor"
+  let m = t.match(/^([A-Ga-g])\s*(#|b)?\s*[-_\s]*\s*(Major|Minor)$/i);
+  if (m) {
+    const letter = m[1].toUpperCase();
+    const accidental = m[2] || "";
+    const qual = m[3].toLowerCase() === "minor" ? "m" : "";
+    return `${letter}${accidental}${qual}`;
+  }
+
+  // 2) Shorthand: Letter + optional accidental + optional 'm'
+  m = t.match(/^([A-Ga-g])\s*(#|b)?\s*(m)?$/);
+  if (m) {
+    const letter = m[1].toUpperCase();
+    const accidental = m[2] || "";
+    const qual = m[3] ? "m" : "";
+    return `${letter}${accidental}${qual}`;
+  }
+
+  // Unknown pattern: return as-is (caller may still log/handle).
+  return t;
+}
+
+/** Resolve Camelot code from normalized key, with enharmonic fallback. */
+function camelotForKey(normKey) {
+  if (!normKey) return null;
+  if (keyToCamelot[normKey]) return keyToCamelot[normKey];
+  const alt = enharmonicMap[normKey];
+  return alt && keyToCamelot[alt] ? keyToCamelot[alt] : null;
+}
+
+/**
+ * Expected filename template:
  * {track_id}--{track_name}--{artists}--{mix_name}--{bpm}--{key}--{release_date}--{label}--{purchase_date}.{ext}
  */
 export function parseBeatportFilename(gcsObjectName) {
@@ -98,8 +173,10 @@ export function parseBeatportFilename(gcsObjectName) {
   const mix_name = unslug(mixNameRaw);
   const label = unslug(labelRaw);
   const bpm = /^\d+$/.test(bpmRaw) ? Number(bpmRaw) : null;
+
   const musical_key = normalizeKey(keyRaw);
-  const camelot_key = keyToCamelot[musical_key] || null;
+  const camelot_key = camelotForKey(musical_key);
+
   const release_date = toIsoDate(releaseDateRaw);
   const purchase_date = toIsoDate(purchaseDateRaw);
 
