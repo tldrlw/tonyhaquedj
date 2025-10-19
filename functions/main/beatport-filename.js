@@ -46,7 +46,7 @@ const enharmonicMap = {
   "A#": "Bb",
   "D#": "Eb",
   "G#": "Ab",
-  "C#": "Db", // extra coverage (we prefer Db for Camelot 3B)
+  "C#": "Db",
   Db: "C#",
   Gb: "F#",
   Cb: "B",
@@ -86,6 +86,21 @@ function unslug(s) {
   return t;
 }
 
+/** Simple heuristic: is this title likely a question? */
+function looksLikeAQuestion(s) {
+  return /^(who|what|when|where|why|how|is|are|do|does|did|can|could|will|would)\b/i.test(
+    s
+  );
+}
+
+/**
+ * For track titles: only convert a trailing underscore to a “?”
+ * if the title appears to be a question.
+ */
+function fixTrailingQuestionMarkForTitle(s) {
+  return looksLikeAQuestion(s) ? s.replace(/_(?=$)/, "?") : s;
+}
+
 /** Parse YYYY-MM-DD → ISO string (UTC) */
 function toIsoDate(s) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -107,11 +122,9 @@ function toIsoDate(s) {
 export function normalizeKey(raw) {
   if (!raw) return null;
 
-  // Restore apostrophes, trim, and normalize accidentals.
   const t0 = raw.replace(/_/g, "'").trim();
-  const t = t0.replace(/\u266D/g, "b").replace(/\u266F/g, "#"); // ♭ → b, ♯ → #
+  const t = t0.replace(/\u266D/g, "b").replace(/\u266F/g, "#");
 
-  // 1) Full form: Letter + optional accidental + "Major|Minor"
   let m = t.match(/^([A-Ga-g])\s*(#|b)?\s*[-_\s]*\s*(Major|Minor)$/i);
   if (m) {
     const letter = m[1].toUpperCase();
@@ -120,7 +133,6 @@ export function normalizeKey(raw) {
     return `${letter}${accidental}${qual}`;
   }
 
-  // 2) Shorthand: Letter + optional accidental + optional 'm'
   m = t.match(/^([A-Ga-g])\s*(#|b)?\s*(m)?$/);
   if (m) {
     const letter = m[1].toUpperCase();
@@ -129,7 +141,6 @@ export function normalizeKey(raw) {
     return `${letter}${accidental}${qual}`;
   }
 
-  // Unknown pattern: return as-is (caller may still log/handle).
   return t;
 }
 
@@ -168,7 +179,7 @@ export function parseBeatportFilename(gcsObjectName) {
   ] = parts;
 
   const track_id = Number(trackIdStr);
-  const track_name = unslug(trackNameRaw);
+  const track_name = fixTrailingQuestionMarkForTitle(unslug(trackNameRaw));
   const artists = unslug(artistsRaw);
   const mix_name = unslug(mixNameRaw);
   const label = unslug(labelRaw);

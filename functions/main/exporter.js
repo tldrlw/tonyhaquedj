@@ -15,8 +15,25 @@ function stamp() {
   )}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
+/**
+ * BigQuery’s Node.js client often represents TIMESTAMP fields as:
+ *   { value: "2025-10-02T00:00:00.000Z" }
+ * To keep your snapshot clean, we flatten only the expected timestamp fields
+ * into plain ISO 8601 strings. (Whitelist for clarity and safety.)
+ */
+function flattenWhitelistedTimestamps(row) {
+  for (const k of ["release_date", "purchase_date", "ingested_at"]) {
+    const v = row[k];
+    if (v && typeof v === "object" && "value" in v) {
+      row[k] = v.value; // becomes "2025-10-02T00:00:00.000Z"
+    }
+  }
+  return row;
+}
+
 export async function exportSnapshot(req, res) {
   try {
+    // Env vars are supplied by Terraform; we don't add fallbacks here.
     const PROJECT_ID = process.env.PROJECT_ID;
     const DATASET = process.env.BQ_DATASET;
     const TABLE = process.env.BQ_TABLE;
@@ -24,11 +41,16 @@ export async function exportSnapshot(req, res) {
     const PREFIX = process.env.GCS_PREFIX;
     const BQ_LOCATION = process.env.BQ_LOCATION;
 
+    if (!PROJECT_ID) throw new Error("PROJECT_ID is required");
+    if (!DATASET) throw new Error("BQ_DATASET is required");
+    if (!TABLE) throw new Error("BQ_TABLE is required");
     if (!BUCKET) throw new Error("GCS_BUCKET is required");
+    if (!PREFIX) throw new Error("GCS_PREFIX is required");
+    if (!BQ_LOCATION) throw new Error("BQ_LOCATION is required");
 
     const fqTable = `\`${PROJECT_ID}.${DATASET}.${TABLE}\``;
 
-    // Kick off query
+    // Query
     const [job] = await bq.createQueryJob({
       query: `SELECT * FROM ${fqTable} ORDER BY ingested_at`,
       location: BQ_LOCATION,
@@ -38,10 +60,14 @@ export async function exportSnapshot(req, res) {
         severity: "INFO",
         message: "Query started",
         jobId: job.id,
+        projectId: PROJECT_ID,
+        dataset: DATASET,
+        table: TABLE,
+        bqLocation: BQ_LOCATION,
       })
     );
 
-    // Prepare GCS destination
+    // Destination
     const snapName = `${PREFIX.replace(/\/?$/, "/")}chunes-${stamp()}.json.gz`;
     const file = storage.bucket(BUCKET).file(snapName);
 
@@ -66,11 +92,12 @@ export async function exportSnapshot(req, res) {
     while (true) {
       const [rows, , resp] = await job.getQueryResults({
         pageToken,
-        maxResults: 50000,
+        maxResults: 50_000,
         autoPaginate: false,
       });
 
-      for (const r of rows) {
+      for (const raw of rows) {
+        const r = flattenWhitelistedTimestamps(raw);
         if (wrote) gzip.write(",");
         gzip.write(JSON.stringify(r));
         wrote = true;
@@ -84,16 +111,14 @@ export async function exportSnapshot(req, res) {
     gzip.write("]");
     gzip.end();
 
-    // Wait for streams to finish
+    // Wait for streams (async/await; no manual Promise construction)
     await Promise.all([once(gzip, "end"), once(fileWrite, "finish")]);
 
-    // Optional: attach rowCount to custom metadata
+    // Attach rowCount as custom metadata (string)
     await file.setMetadata({ metadata: { rowCount: String(totalRows) } });
 
-    // Fetch object metadata for manifest extras
+    // Manifest
     const [meta] = await file.getMetadata();
-
-    // Build + write manifest
     const manifest = {
       version: new Date().toISOString(),
       schemaVersion: 1,
