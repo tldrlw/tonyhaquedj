@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-const MANIFEST_URL = import.meta.env.VITE_MANIFEST_URL;
-// e.g. VITE_MANIFEST_URL=https://storage.googleapis.com/chunes-snapshots-<project>-<region>/manifest/latest.json
+const MANIFEST_URL =
+  "https://storage.googleapis.com/chunes-snapshots-dulcet-provider-474401-d3-us-central1/manifest/latest.json";
 
 function prettyDate(s) {
   try {

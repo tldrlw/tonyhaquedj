@@ -2,13 +2,9 @@
 import path from "node:path";
 
 /**
- * Camelot Wheel lookup by normalized key:
- * Majors: "C", "F#", "Bb", ...
- * Minors: "Am", "F#m", "Bbm", ...
- * (We prefer flat spellings where Camelot commonly does.)
+ * Camelot Wheel lookup by normalized key
  */
 const keyToCamelot = {
-  // Minor (A)
   Abm: "1A",
   Ebm: "2A",
   Bbm: "3A",
@@ -22,7 +18,6 @@ const keyToCamelot = {
   "F#m": "11A",
   "C#m": "12A",
 
-  // Major (B)
   B: "1B",
   "F#": "2B",
   Db: "3B",
@@ -37,12 +32,7 @@ const keyToCamelot = {
   E: "12B",
 };
 
-/**
- * Enharmonic equivalents used as a fallback when direct lookup misses.
- * Includes rare/theoretical forms to be bullet-proof.
- */
 const enharmonicMap = {
-  // Major
   "A#": "Bb",
   "D#": "Eb",
   "G#": "Ab",
@@ -53,8 +43,6 @@ const enharmonicMap = {
   Fb: "E",
   "E#": "F",
   "B#": "C",
-
-  // Minor
   "A#m": "Bbm",
   "D#m": "Ebm",
   "G#m": "Abm",
@@ -66,12 +54,10 @@ const enharmonicMap = {
   "B#m": "Cm",
 };
 
-/** Can_t → Can't (only when _ is between alphanumerics) */
 function restoreApostrophes(s) {
   return s.replace(/([A-Za-z0-9])_([A-Za-z0-9])/g, "$1'$2");
 }
 
-/** Beatport “unslug”: hyphens→spaces, collapse multiples, fix paren spacing, NFC normalize */
 function unslug(s) {
   const withApos = restoreApostrophes(s);
   let t = withApos
@@ -86,22 +72,16 @@ function unslug(s) {
   return t;
 }
 
-/** Simple heuristic: is this title likely a question? */
 function looksLikeAQuestion(s) {
   return /^(who|what|when|where|why|how|is|are|do|does|did|can|could|will|would)\b/i.test(
     s
   );
 }
 
-/**
- * For track titles: only convert a trailing underscore to a “?”
- * if the title appears to be a question.
- */
 function fixTrailingQuestionMarkForTitle(s) {
   return looksLikeAQuestion(s) ? s.replace(/_(?=$)/, "?") : s;
 }
 
-/** Parse YYYY-MM-DD → ISO string (UTC) */
 function toIsoDate(s) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
   const [y, m, d] = s.split("-").map(Number);
@@ -109,19 +89,8 @@ function toIsoDate(s) {
   return Number.isNaN(+dt) ? null : dt.toISOString();
 }
 
-/**
- * Normalize musical key into:
- *   Majors: "C", "F#", "Bb", ...
- *   Minors: "Am", "F#m", "Bbm", ...
- *
- * Accepts:
- *   - "E-Minor", "C-Major", "Ab Minor", "F#   Major"
- *   - "Em", "C", "Abm", "F#"
- *   - Unicode accidentals (♭/♯) are converted to b/#.
- */
 export function normalizeKey(raw) {
   if (!raw) return null;
-
   const t0 = raw.replace(/_/g, "'").trim();
   const t = t0.replace(/\u266D/g, "b").replace(/\u266F/g, "#");
 
@@ -144,7 +113,6 @@ export function normalizeKey(raw) {
   return t;
 }
 
-/** Resolve Camelot code from normalized key, with enharmonic fallback. */
 function camelotForKey(normKey) {
   if (!normKey) return null;
   if (keyToCamelot[normKey]) return keyToCamelot[normKey];
@@ -153,8 +121,15 @@ function camelotForKey(normKey) {
 }
 
 /**
- * Expected filename template:
- * {track_id}--{track_name}--{artists}--{mix_name}--{bpm}--{key}--{release_date}--{label}--{purchase_date}.{ext}
+ * Beatport filename convention:
+ * {track_id}--{track_name}--{artists}--{mix_name}--{bpm}--{key}--{release_year}-{release_month}-{release_day}--{label}--{purchase_year}-{purchase_month}-{purchase_day}.{ext}
+ *
+ * Example:
+ * 17696158--Ain_t-No-Other-Man--Murphy_s-Law-(UK)--Rework---Extended-Mix--128--Gb-Minor--2023-05-19--RCA_Legacy--2025-10-18.aiff
+ *
+ * Note:
+ * - `mix_name` may contain additional `--` (e.g. "Rework---Extended-Mix"), and will be parsed safely.
+ * - Dates are always in YYYY-MM-DD format.
  */
 export function parseBeatportFilename(gcsObjectName) {
   const base = path.basename(gcsObjectName);
@@ -162,29 +137,34 @@ export function parseBeatportFilename(gcsObjectName) {
   const stem = base.slice(0, base.length - (ext ? ext.length + 1 : 0));
 
   const parts = stem.split("--");
-  if (parts.length !== 9) {
-    return { error: `Expected 9 fields, got ${parts.length}`, stem, ext };
+  if (parts.length < 9) {
+    return { error: `Expected ≥9 fields, got ${parts.length}`, stem, ext };
   }
 
-  const [
-    trackIdStr,
-    trackNameRaw,
-    artistsRaw,
-    mixNameRaw,
-    bpmRaw,
-    keyRaw,
-    releaseDateRaw,
-    labelRaw,
-    purchaseDateRaw,
-  ] = parts;
+  const purchaseDateRaw = parts.pop();
+  const labelRaw = parts.pop();
+  const releaseDateRaw = parts.pop();
+  const keyRaw = parts.pop();
+  const bpmRaw = parts.pop();
+  const trackIdStr = parts.shift();
+
+  const middle = parts.join("--");
+  const midSplit = middle.split("--");
+  if (midSplit.length < 3) {
+    return { error: "Unable to reconstruct middle fields", stem, ext };
+  }
+
+  const trackNameRaw = midSplit[0];
+  const artistsRaw = midSplit[1];
+  const mixNameRaw = midSplit.slice(2).join("--");
 
   const track_id = Number(trackIdStr);
   const track_name = fixTrailingQuestionMarkForTitle(unslug(trackNameRaw));
   const artists = unslug(artistsRaw);
   const mix_name = unslug(mixNameRaw);
   const label = unslug(labelRaw);
-  const bpm = /^\d+$/.test(bpmRaw) ? Number(bpmRaw) : null;
 
+  const bpm = /^\d+$/.test(bpmRaw) ? Number(bpmRaw) : null;
   const musical_key = normalizeKey(keyRaw);
   const camelot_key = camelotForKey(musical_key);
 
