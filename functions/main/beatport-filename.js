@@ -5,6 +5,7 @@ import path from "node:path";
  * Camelot Wheel lookup by normalized key
  */
 const keyToCamelot = {
+  // Minor keys (A side)
   Abm: "1A",
   Ebm: "2A",
   Bbm: "3A",
@@ -18,6 +19,7 @@ const keyToCamelot = {
   "F#m": "11A",
   "C#m": "12A",
 
+  // Major keys (B side)
   B: "1B",
   "F#": "2B",
   Db: "3B",
@@ -33,6 +35,7 @@ const keyToCamelot = {
 };
 
 const enharmonicMap = {
+  // Major
   "A#": "Bb",
   "D#": "Eb",
   "G#": "Ab",
@@ -43,6 +46,8 @@ const enharmonicMap = {
   Fb: "E",
   "E#": "F",
   "B#": "C",
+
+  // Minor
   "A#m": "Bbm",
   "D#m": "Ebm",
   "G#m": "Abm",
@@ -54,17 +59,30 @@ const enharmonicMap = {
   "B#m": "Cm",
 };
 
+/**
+ * 🔤 This function is what makes `Can_t Resist` → `Can't Resist`
+ * It finds underscores **between two alphanumeric characters** and replaces them with `'`.
+ *
+ * ✅ Examples:
+ * - `Can_t` → `Can't`
+ * - `Don_t` → `Don't`
+ * - `I_m` → `I'm`
+ */
 function restoreApostrophes(s) {
   return s.replace(/([A-Za-z0-9])_([A-Za-z0-9])/g, "$1'$2");
 }
 
+/**
+ * Beatport “unslug”: hyphens → spaces, collapse multiples, clean up parens
+ * ✅ This function calls `restoreApostrophes()` first to normalize things like `Can_t` → `Can't`
+ */
 function unslug(s) {
-  const withApos = restoreApostrophes(s);
+  const withApos = restoreApostrophes(s); // <-- 🔥 Apostrophe conversion happens here
   let t = withApos
-    .replace(/-/g, " ")
-    .replace(/\s{2,}/g, " ")
-    .replace(/\s+\)/g, ")")
-    .replace(/\(\s+/g, "(")
+    .replace(/-/g, " ") // dashes → spaces
+    .replace(/\s{2,}/g, " ") // collapse multiple spaces
+    .replace(/\s+\)/g, ")") // fix spacing before )
+    .replace(/\(\s+/g, "(") // fix spacing after (
     .trim();
   try {
     t = t.normalize("NFC");
@@ -78,8 +96,19 @@ function looksLikeAQuestion(s) {
   );
 }
 
-function fixTrailingQuestionMarkForTitle(s) {
-  return looksLikeAQuestion(s) ? s.replace(/_(?=$)/, "?") : s;
+/**
+ * Handle trailing underscores:
+ * - If it's a question, replace trailing `_` with `?`
+ * - Otherwise, replace trailing `_` with apostrophe `'`
+ */
+function fixTrailingQuestionMarkOrApostrophe(s) {
+  const trimmed = s.trim();
+  if (/_+$/.test(trimmed)) {
+    return looksLikeAQuestion(trimmed)
+      ? trimmed.replace(/_+$/, "?")
+      : trimmed.replace(/_+$/, "'");
+  }
+  return trimmed;
 }
 
 function toIsoDate(s) {
@@ -121,15 +150,31 @@ function camelotForKey(normKey) {
 }
 
 /**
- * Beatport filename convention:
+ * 📁 Beatport filename convention
+ * ---------------------------------
+ * Files downloaded from Beatport follow this structure:
+ *
  * {track_id}--{track_name}--{artists}--{mix_name}--{bpm}--{key}--{release_year}-{release_month}-{release_day}--{label}--{purchase_year}-{purchase_month}-{purchase_day}.{ext}
  *
- * Example:
+ * ✅ Real-world example:
+ *
  * 17696158--Ain_t-No-Other-Man--Murphy_s-Law-(UK)--Rework---Extended-Mix--128--Gb-Minor--2023-05-19--RCA_Legacy--2025-10-18.aiff
  *
- * Note:
- * - `mix_name` may contain additional `--` (e.g. "Rework---Extended-Mix"), and will be parsed safely.
- * - Dates are always in YYYY-MM-DD format.
+ * ✅ Parsing result:
+ * - track_id: 17696158
+ * - track_name: Ain't No Other Man
+ * - artists: Murphy's Law (UK)
+ * - mix_name: Rework - Extended Mix
+ * - bpm: 128
+ * - musical_key: Gb Minor
+ * - release_date: 2023-05-19
+ * - label: RCA Legacy
+ * - purchase_date: 2025-10-18
+ *
+ * 🧠 Notes:
+ * - `mix_name` may contain extra `--` (e.g. `Rework---Extended-Mix`), so we parse from the ends inward.
+ * - `_` between letters is treated as `'` (e.g. `Can_t` → `Can't`).
+ * - Trailing `_` becomes `?` **only** if the title looks like a question (e.g. `Was-I-Loved_` → `Was I Loved?`).
  */
 export function parseBeatportFilename(gcsObjectName) {
   const base = path.basename(gcsObjectName);
@@ -141,13 +186,15 @@ export function parseBeatportFilename(gcsObjectName) {
     return { error: `Expected ≥9 fields, got ${parts.length}`, stem, ext };
   }
 
+  // Pop known fields from the end first (purchase_date, label, release_date, key, bpm)
   const purchaseDateRaw = parts.pop();
   const labelRaw = parts.pop();
   const releaseDateRaw = parts.pop();
   const keyRaw = parts.pop();
   const bpmRaw = parts.pop();
-  const trackIdStr = parts.shift();
+  const trackIdStr = parts.shift(); // track_id is always first
 
+  // Reconstruct the middle part safely (track name, artists, mix name)
   const middle = parts.join("--");
   const midSplit = middle.split("--");
   if (midSplit.length < 3) {
@@ -158,8 +205,9 @@ export function parseBeatportFilename(gcsObjectName) {
   const artistsRaw = midSplit[1];
   const mixNameRaw = midSplit.slice(2).join("--");
 
+  // Normalize everything
   const track_id = Number(trackIdStr);
-  const track_name = fixTrailingQuestionMarkForTitle(unslug(trackNameRaw));
+  const track_name = fixTrailingQuestionMarkOrApostrophe(unslug(trackNameRaw));
   const artists = unslug(artistsRaw);
   const mix_name = unslug(mixNameRaw);
   const label = unslug(labelRaw);

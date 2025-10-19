@@ -19,15 +19,25 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
+        // --- Fetch manifest ---
         const mRes = await fetch(MANIFEST_URL, { cache: "no-cache" });
         if (!mRes.ok) throw new Error(`Manifest HTTP ${mRes.status}`);
         const m = await mRes.json();
         setManifest(m);
 
+        // --- Fetch snapshot ---
         const sRes = await fetch(m.url, { cache: "no-cache" });
         if (!sRes.ok) throw new Error(`Snapshot HTTP ${sRes.status}`);
-        const data = await sRes.json(); // NOTE: loads entire array into memory
-        setRows(data);
+        const data = await sRes.json();
+
+        // --- Sort by release_date (descending) ---
+        const sorted = [...data].sort((a, b) => {
+          const da = a.release_date ? new Date(a.release_date) : 0;
+          const db = b.release_date ? new Date(b.release_date) : 0;
+          return db - da; // newest first
+        });
+
+        setRows(sorted);
       } catch (e) {
         setError(String(e?.message || e));
       }
@@ -55,33 +65,13 @@ export default function App() {
         </a>
       </p>
 
-      <input
-        placeholder="Filter by title/artist/label…"
-        onChange={(e) => {
-          const q = e.target.value.toLowerCase();
-          if (!q) {
-            setRows(null);
-            setTimeout(() => setRows(manifest._cache || manifest._cache), 0);
-            return;
-          }
-          const src = manifest._cache || manifest._cache;
-        }}
-        style={{
-          padding: 8,
-          width: "100%",
-          maxWidth: 480,
-          margin: "12px 0",
-          border: "1px solid #ddd",
-          borderRadius: 8,
-        }}
-      />
-
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
         <thead>
           <tr>
             <th align="left">ID</th>
             <th align="left">Track</th>
             <th align="left">Artists</th>
+            <th align="left">Mix Name</th>
             <th align="left">Label</th>
             <th align="left">BPM</th>
             <th align="left">Key</th>
@@ -96,6 +86,7 @@ export default function App() {
               <td>{r.track_id}</td>
               <td>{r.track_name}</td>
               <td>{r.artists}</td>
+              <td>{r.mix_name}</td>
               <td>{r.label}</td>
               <td>{r.bpm ?? ""}</td>
               <td>{r.camelot_key || r.musical_key || ""}</td>
