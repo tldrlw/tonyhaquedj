@@ -31,8 +31,8 @@ resource "google_cloudfunctions2_function" "main" {
     available_memory      = "1024M"
     timeout_seconds       = 300
     environment_variables = {
-      BQ_DATASET = local.bq_dataset
-      BQ_TABLE   = local.bq_table
+      BQ_DATASET = var.bq_dataset
+      BQ_TABLE   = var.bq_table
     }
   }
 
@@ -80,11 +80,12 @@ resource "google_cloudfunctions2_function" "exporter" {
     timeout_seconds       = 540
     max_instance_count    = 1
     environment_variables = {
-      BQ_DATASET  = local.bq_dataset
-      BQ_TABLE    = local.bq_table
-      BQ_LOCATION = var.region
+      PROJECT_ID  = var.project_id # <— add this
+      BQ_DATASET  = var.bq_dataset
+      BQ_TABLE    = var.bq_table
       GCS_BUCKET  = google_storage_bucket.snapshots.name
       GCS_PREFIX  = "snapshots"
+      BQ_LOCATION = var.region
     }
   }
   # HTTP-only (no event_trigger)

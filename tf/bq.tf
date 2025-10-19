@@ -8,7 +8,7 @@ resource "google_project_service" "bigquery" {
 # Create the dataset
 resource "google_bigquery_dataset" "chunes" {
   project    = var.project_id
-  dataset_id = local.bq_dataset
+  dataset_id = var.bq_dataset
   location   = var.region
   depends_on = [google_project_service.bigquery]
 }
@@ -17,7 +17,7 @@ resource "google_bigquery_dataset" "chunes" {
 resource "google_bigquery_table" "tracks" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.chunes.dataset_id
-  table_id   = local.bq_table
+  table_id   = var.bq_table
 
   deletion_protection = false
 

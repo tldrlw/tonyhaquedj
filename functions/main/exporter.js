@@ -17,13 +17,12 @@ function stamp() {
 
 export async function exportSnapshot(req, res) {
   try {
-    const PROJECT_ID =
-      process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT;
-    const DATASET = process.env.BQ_DATASET || "chunes";
-    const TABLE = process.env.BQ_TABLE || "tracks";
+    const PROJECT_ID = process.env.PROJECT_ID;
+    const DATASET = process.env.BQ_DATASET;
+    const TABLE = process.env.BQ_TABLE;
     const BUCKET = process.env.GCS_BUCKET;
-    const PREFIX = process.env.GCS_PREFIX || "snapshots";
-    const BQ_LOCATION = process.env.BQ_LOCATION || undefined;
+    const PREFIX = process.env.GCS_PREFIX;
+    const BQ_LOCATION = process.env.BQ_LOCATION;
 
     if (!BUCKET) throw new Error("GCS_BUCKET is required");
 

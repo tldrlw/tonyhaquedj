@@ -160,3 +160,12 @@ resource "google_service_account_iam_member" "deployer_can_act_as_fn_sa_exporter
   member             = "serviceAccount:${var.impersonate_service_account}"
   # Or: member = "user:you@yourdomain.com"
 }
+
+# Allow your user to invoke the HTTP exporter (Cloud Functions Gen2 layer)
+resource "google_cloudfunctions2_function_iam_member" "exporter_invoker_cf" {
+  project        = var.project_id
+  location       = var.region
+  cloud_function = google_cloudfunctions2_function.exporter.name
+  role           = "roles/cloudfunctions.invoker"
+  member         = "user:${var.exporter_invoker_user}"
+}
