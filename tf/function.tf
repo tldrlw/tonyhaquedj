@@ -1,7 +1,4 @@
-########################
 # Package source
-########################
-
 data "archive_file" "fn_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../functions/main"
@@ -15,14 +12,10 @@ resource "google_storage_bucket_object" "fn_src" {
   cache_control = "no-store"
 }
 
-########################
 # Cloud Function (Gen 2) with Eventarc trigger
-########################
-
 resource "google_cloudfunctions2_function" "main" {
   name     = var.func_name
   location = var.region # ensure this matches your bucket's region
-
   build_config {
     runtime     = "nodejs20"
     entry_point = "handleGcsFinalize"
@@ -33,7 +26,6 @@ resource "google_cloudfunctions2_function" "main" {
       }
     }
   }
-
   service_config {
     service_account_email = google_service_account.fn_sa.email
     available_memory      = "1024M"
@@ -54,7 +46,6 @@ resource "google_cloudfunctions2_function" "main" {
     }
     retry_policy = "RETRY_POLICY_RETRY"
   }
-
   # Make sure the trigger's required IAM is in place BEFORE creation
   depends_on = [
     google_project_service.apis,
@@ -66,5 +57,42 @@ resource "google_cloudfunctions2_function" "main" {
     google_project_iam_binding.eventarc_invoker_event_receiver, # already added
     google_project_iam_member.terraform_cf_admin,               # <-- add this
     google_service_account_iam_member.terraform_can_act_as_eventarc_invoker
+  ]
+}
+
+resource "google_cloudfunctions2_function" "exporter" {
+  name     = "export-snapshot"
+  location = var.region
+
+  build_config {
+    runtime     = "nodejs20"
+    entry_point = "exportSnapshot" # exported via index.js → exporter.js
+    source {
+      storage_source {
+        bucket = google_storage_bucket.build_src.name
+        object = google_storage_bucket_object.fn_src.name
+      }
+    }
+  }
+  service_config {
+    service_account_email = google_service_account.fn_sa_exporter.email
+    available_memory      = "2048M"
+    timeout_seconds       = 540
+    max_instance_count    = 1
+    environment_variables = {
+      BQ_DATASET  = local.bq_dataset
+      BQ_TABLE    = local.bq_table
+      BQ_LOCATION = var.region
+      GCS_BUCKET  = google_storage_bucket.snapshots.name
+      GCS_PREFIX  = "snapshots"
+    }
+  }
+  # HTTP-only (no event_trigger)
+  depends_on = [
+    google_project_service.apis,
+    google_storage_bucket.build_src,
+    google_storage_bucket_object.fn_src,
+    google_service_account.fn_sa_exporter,
+    google_storage_bucket.snapshots,
   ]
 }

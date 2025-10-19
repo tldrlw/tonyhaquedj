@@ -96,3 +96,67 @@ resource "google_storage_bucket_iam_member" "fn_can_read_objects" {
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${google_service_account.fn_sa.email}"
 }
+
+# PUBLIC READ for everyone (static-hosted JSON)
+resource "google_storage_bucket_iam_member" "snapshots_public_read" {
+  bucket = google_storage_bucket.snapshots.name
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
+}
+
+# Runtime SA for the Cloud Function (Gen2)
+resource "google_service_account" "fn_sa_exporter" {
+  account_id   = "main-fn-sa-exporter"
+  display_name = "main-fn-sa-exporter"
+}
+
+# OPTIONAL: allow your exporter to WRITE objects (bound only if var provided)
+resource "google_storage_bucket_iam_member" "snapshots_writer" {
+  bucket = google_storage_bucket.snapshots.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.fn_sa_exporter.email}"
+}
+
+# Logs for exporter
+resource "google_project_iam_member" "fn_exporter_logs" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.fn_sa_exporter.email}"
+}
+
+# BigQuery read for exporter
+resource "google_project_iam_member" "fn_exporter_bq_jobuser" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.fn_sa_exporter.email}"
+}
+
+resource "google_bigquery_dataset_iam_member" "fn_exporter_bq_viewer" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.chunes.dataset_id
+  role       = "roles/bigquery.dataViewer"
+  member     = "serviceAccount:${google_service_account.fn_sa_exporter.email}"
+}
+
+# Optional but fine to include
+resource "google_project_iam_member" "fn_exporter_bq_readsessionuser" {
+  project = var.project_id
+  role    = "roles/bigquery.readSessionUser"
+  member  = "serviceAccount:${google_service_account.fn_sa_exporter.email}"
+}
+
+# Deployer can act as the INGEST runtime SA (main-fn-sa)
+resource "google_service_account_iam_member" "deployer_can_act_as_fn_sa_ingest" {
+  service_account_id = google_service_account.fn_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${var.impersonate_service_account}"
+  # Or, if you deploy as a user: member = "user:you@yourdomain.com"
+}
+
+# Deployer can act as the EXPORTER runtime SA (main-fn-sa-exporter)
+resource "google_service_account_iam_member" "deployer_can_act_as_fn_sa_exporter" {
+  service_account_id = google_service_account.fn_sa_exporter.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${var.impersonate_service_account}"
+  # Or: member = "user:you@yourdomain.com"
+}
