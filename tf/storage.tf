@@ -47,7 +47,37 @@ resource "google_storage_bucket" "snapshots" {
 # resource "google_storage_bucket" "snapshots_logs" { ... }
 # and then set logging { log_bucket = google_storage_bucket.snapshots_logs.name }
 
-# NICE-TO-HAVE OUTPUTS
+resource "google_storage_bucket" "react_site" {
+  name                        = "chunes-web-${var.project_id}-${var.region}"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  force_destroy               = true
+  # Website configuration (GCS website endpoints are HTTP only)
+  website {
+    main_page_suffix = "index.html"
+    not_found_page   = "404.html"
+  }
+  # (Optional) Keep bucket tidy with versioning and lifecycle
+  # versioning { enabled = true }
+  # lifecycle_rule {
+  #   action { type = "Delete" }
+  #   condition {
+  #     num_newer_versions = 10
+  #   }
+  # }
+  # (Optional) CORS so fonts/XHRs can be fetched from elsewhere if needed
+  cors {
+    origin          = ["*"]
+    method          = ["GET", "HEAD", "OPTIONS"]
+    response_header = ["*"]
+    max_age_seconds = 3600
+  }
+  # (Optional) Default event-based hold/retention can be added here if needed
+  # retention_policy {
+  #   retention_period = 604800 # 7 days, in seconds
+  # }
+}
+
 output "snapshots_bucket_name" {
   value = google_storage_bucket.snapshots.name
 }
@@ -55,4 +85,21 @@ output "snapshots_bucket_name" {
 output "snapshots_public_url_latest_manifest" {
   description = "Convenience URL for the tiny manifest (we will write manifest/latest.json)."
   value       = "https://storage.googleapis.com/${google_storage_bucket.snapshots.name}/manifest/latest.json"
+}
+
+output "bucket_name" {
+  value       = google_storage_bucket.react_site.name
+  description = "Bucket name"
+}
+
+output "website_root_url" {
+  # GCS website-style endpoint (HTTP). With website routing rules applied.
+  value       = "http://${google_storage_bucket.react_site.name}.storage.googleapis.com/"
+  description = "Website endpoint (HTTP). For HTTPS + custom domain, use a load balancer."
+}
+
+output "json_api_url_example" {
+  # Direct object URL via JSON API (HTTPS)
+  value       = "https://storage.googleapis.com/${google_storage_bucket.react_site.name}/index.html"
+  description = "Direct HTTPS URL for a specific object (example: index.html)"
 }

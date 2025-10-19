@@ -169,3 +169,10 @@ resource "google_cloudfunctions2_function_iam_member" "exporter_invoker_cf" {
   role           = "roles/cloudfunctions.invoker"
   member         = "user:${var.exporter_invoker_user}"
 }
+
+# Public read access for all objects (website hosting)
+resource "google_storage_bucket_iam_binding" "public_read" {
+  bucket  = google_storage_bucket.react_site.name
+  role    = "roles/storage.objectViewer"
+  members = ["allUsers"]
+}

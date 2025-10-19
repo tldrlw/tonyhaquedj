@@ -6,8 +6,8 @@ import { parseBeatportFilename } from "./beatport-filename.js";
 const bigquery = new BigQuery();
 const storage = new Storage();
 
-const DATASET = process.env.BQ_DATASET || "chunes";
-const TABLE = process.env.BQ_TABLE || "tracks";
+const DATASET = process.env.BQ_DATASET;
+const TABLE = process.env.BQ_TABLE;
 const FORCE_METADATA_SIZE =
   (process.env.FORCE_METADATA_SIZE || "false").toLowerCase() === "true";
 
@@ -21,6 +21,18 @@ console.log(
     ts: new Date().toISOString(),
   })
 );
+
+// ✅ Fail fast if required env is missing (helps Cloud Run health checks)
+if (!DATASET || !TABLE) {
+  console.error(
+    JSON.stringify({
+      severity: "ERROR",
+      message: `Missing required env: BQ_DATASET="${DATASET}" BQ_TABLE="${TABLE}"`,
+    })
+  );
+  // Throwing here intentionally fails the container so misconfig is visible immediately.
+  throw new Error("Missing required env: BQ_DATASET and/or BQ_TABLE");
+}
 
 /* ---------------- utils ---------------- */
 function safe(v) {
@@ -128,7 +140,7 @@ async function resolveBytes({ bucket, name, sizeFromEvent }) {
   try {
     const file = storage.bucket(bucket).file(name);
     const [exists] = await file.exists();
-    log("info", "resolveBytes:file.exists()", { exists });
+    log("info", "resolveBytes:file.exists()", { exists, bucket, name });
     if (!exists) {
       log("warning", "resolveBytes:fileNotFound", { bucket, name });
       return null;
@@ -190,6 +202,8 @@ async function getTable() {
   } catch (err) {
     log("error", "Failed to access dataset/table", {
       error: err?.message || String(err),
+      datasetId: DATASET,
+      tableId: TABLE,
     });
     throw err;
   }
@@ -222,7 +236,31 @@ async function processObject({
     });
     return { skipped: true, reason: parsed.error, objectName };
   }
-  log("info", "Parsed filename", { objectName, parsedPreview: parsed });
+
+  // 👀 Quick field health hints
+  if (!parsed.release_date) {
+    log("warning", "Parsed track missing release_date", { objectName });
+  }
+  if (!parsed.purchase_date) {
+    log("warning", "Parsed track missing purchase_date", { objectName });
+  }
+
+  log("info", "Parsed filename", {
+    objectName,
+    parsedPreview: {
+      track_id: parsed.track_id,
+      track_name: parsed.track_name,
+      artists: parsed.artists,
+      mix_name: parsed.mix_name,
+      bpm: parsed.bpm,
+      musical_key: parsed.musical_key,
+      camelot_key: parsed.camelot_key,
+      label: parsed.label,
+      release_date: parsed.release_date,
+      purchase_date: parsed.purchase_date,
+      file_ext: parsed.file_ext,
+    },
+  });
 
   const normalized = {
     track_id: toInt(parsed.track_id),
@@ -264,6 +302,9 @@ async function processObject({
     log("info", "Inserting row to BigQuery (raw)", {
       dataset: DATASET,
       table: TABLE,
+      insertId: insertId || objectName,
+      objectName,
+      sizeMB,
     });
     const t0 = Date.now();
     const [resp] = await table.insert(rows, {
@@ -349,7 +390,13 @@ export async function handleGcsFinalize(cloudEvent) {
   const rawSize = d.size ?? d.contentLength ?? null;
   const insertId = cloudEvent?.id || `${name}:${generation}` || name;
 
-  log("info", "Resolved event fields", { bucket, name, generation, rawSize });
+  log("info", "Resolved event fields", {
+    bucket,
+    name,
+    generation,
+    rawSize,
+    insertId,
+  });
 
   const bytes = await resolveBytes({ bucket, name, sizeFromEvent: rawSize });
   log("info", "Size resolution result", { bucket, name, bytes });
@@ -369,5 +416,7 @@ export async function handleGcsFinalize(cloudEvent) {
       ? "skipped"
       : "failed",
     elapsedMs: Date.now() - tStart,
+    bucket,
+    name,
   });
 }

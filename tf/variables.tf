@@ -31,6 +31,7 @@ variable "bq_dataset" {
 }
 
 variable "bq_table" {
-  type    = string
-  default = "tracks"
+  type        = string
+  default     = "tracks-2"
+  description = "change for wtv you want the cloud functions to use"
 }

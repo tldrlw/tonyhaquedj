@@ -73,6 +73,20 @@ function restoreApostrophes(s) {
 }
 
 /**
+ * Additionally, convert underscores that occur at the **end of a word token**
+ * into apostrophes. This covers cases like:
+ *   - `Let Em_ Know` → `Let Em' Know`
+ *   - `California Dreamin_ feat.` → `California Dreamin' feat.`
+ *
+ * We intentionally do NOT touch a final trailing `_` at end of the whole title
+ * until after we check if the title looks like a question (see below).
+ */
+function restoreWordFinalUnderscores(s) {
+  // Replace "_ " or "_," or "_." or "_)" etc. with apostrophe before that separator
+  return s.replace(/([A-Za-z0-9])_(?=\s|$|[)\](,.;:!?])/g, "$1'");
+}
+
+/**
  * Beatport “unslug”: hyphens → spaces, collapse multiples, clean up parens
  * ✅ This function calls `restoreApostrophes()` first to normalize things like `Can_t` → `Can't`
  */
@@ -111,11 +125,48 @@ function fixTrailingQuestionMarkOrApostrophe(s) {
   return trimmed;
 }
 
+/**
+ * 🧼 Sanitize extra dashes in filenames.
+ * Removes duplicate hyphens (e.g. `---Extended-Mix` → `-Extended-Mix` → then
+ * later dashes will become spaces), trims leading/trailing `-`, and logs a warning if cleaning occurred.
+ */
+function cleanExtraDashes(label, value) {
+  const original = value;
+  let cleaned = value.replace(/-{2,}/g, "-"); // collapse multiple hyphens to single hyphen
+  cleaned = cleaned.replace(/^-+|-+$/g, ""); // remove leading/trailing hyphens
+  cleaned = cleaned.replace(/\s{2,}/g, " ").trim(); // collapse extra spaces
+
+  if (cleaned !== original) {
+    console.warn(`⚠️ Sanitized ${label}: "${original}" → "${cleaned}"`);
+  }
+  return cleaned;
+}
+
 function toIsoDate(s) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
   const [y, m, d] = s.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   return Number.isNaN(+dt) ? null : dt.toISOString();
+}
+
+/**
+ * Accept a field that SHOULD contain a date (YYYY-MM-DD). If there are stray
+ * characters (e.g., extra dashes attached), we extract the first valid date.
+ *
+ * Fixes cases like label/purchase boundary oddities:
+ *   "Steel-City-Dance-Discs-" + "--" + "2025-10-02"
+ *   or accidental whitespace/garbage: "  \u200b2025-10-02"
+ */
+function toIsoDateLoose(s, fieldName) {
+  if (!s) return null;
+  const m = String(s).match(/(\d{4}-\d{2}-\d{2})/);
+  if (!m) {
+    console.warn(`⚠️ ${fieldName}: could not find YYYY-MM-DD in "${s}"`);
+    return null;
+  }
+  const iso = toIsoDate(m[1]);
+  if (!iso) console.warn(`⚠️ ${fieldName}: invalid date found in "${s}"`);
+  return iso;
 }
 
 export function normalizeKey(raw) {
@@ -152,29 +203,32 @@ function camelotForKey(normKey) {
 /**
  * 📁 Beatport filename convention
  * ---------------------------------
- * Files downloaded from Beatport follow this structure:
+ * Beatport downloads follow this structured filename pattern:
  *
  * {track_id}--{track_name}--{artists}--{mix_name}--{bpm}--{key}--{release_year}-{release_month}-{release_day}--{label}--{purchase_year}-{purchase_month}-{purchase_day}.{ext}
  *
- * ✅ Real-world example:
- *
+ * ✅ Example & Parsing Result:
+ * Filename:
  * 17696158--Ain_t-No-Other-Man--Murphy_s-Law-(UK)--Rework---Extended-Mix--128--Gb-Minor--2023-05-19--RCA_Legacy--2025-10-18.aiff
  *
- * ✅ Parsing result:
+ * Parsed object:
  * - track_id: 17696158
  * - track_name: Ain't No Other Man
  * - artists: Murphy's Law (UK)
- * - mix_name: Rework - Extended Mix
+ * - mix_name: Rework Extended Mix       ← Dashes converted to spaces
  * - bpm: 128
  * - musical_key: Gb Minor
  * - release_date: 2023-05-19
  * - label: RCA Legacy
  * - purchase_date: 2025-10-18
  *
- * 🧠 Notes:
- * - `mix_name` may contain extra `--` (e.g. `Rework---Extended-Mix`), so we parse from the ends inward.
- * - `_` between letters is treated as `'` (e.g. `Can_t` → `Can't`).
- * - Trailing `_` becomes `?` **only** if the title looks like a question (e.g. `Was-I-Loved_` → `Was I Loved?`).
+ * 🧠 Parsing rules & special cases handled automatically:
+ * - Extra `--` segments are collapsed, and fields are parsed from the ends inward.
+ * - `_` between letters → `'` (e.g. `Can_t Resist` → `Can't Resist`).
+ * - Trailing `_` → `?` **only** if the title looks like a question (e.g. `Was-I-Loved_` → `Was I Loved?`).
+ * - Word-final underscores → `'` (e.g. `Let Em_ Know` → `Let Em' Know`, `Dreamin_ feat.` → `Dreamin' feat.`).
+ * - Multiple consecutive dashes in titles are cleaned (e.g., `Watch-The-Sunrise---Chris-Lake` → `Watch The Sunrise`).
+ * - Extra dashes before purchase date no longer break parsing (e.g. `Steel-City-Dance-Discs---2025-10-02.aiff` → `purchase_date: 2025-10-02`).
  */
 export function parseBeatportFilename(gcsObjectName) {
   const base = path.basename(gcsObjectName);
@@ -188,7 +242,7 @@ export function parseBeatportFilename(gcsObjectName) {
 
   // Pop known fields from the end first (purchase_date, label, release_date, key, bpm)
   const purchaseDateRaw = parts.pop();
-  const labelRaw = parts.pop();
+  let labelRaw = parts.pop();
   const releaseDateRaw = parts.pop();
   const keyRaw = parts.pop();
   const bpmRaw = parts.pop();
@@ -201,23 +255,37 @@ export function parseBeatportFilename(gcsObjectName) {
     return { error: "Unable to reconstruct middle fields", stem, ext };
   }
 
-  const trackNameRaw = midSplit[0];
+  let trackNameRaw = midSplit[0];
   const artistsRaw = midSplit[1];
-  const mixNameRaw = midSplit.slice(2).join("--");
+  let mixNameRaw = midSplit.slice(2).join("--");
+
+  // 🧼 Clean extra dashes before parsing/unslugging
+  trackNameRaw = cleanExtraDashes("track_name", trackNameRaw);
+  mixNameRaw = cleanExtraDashes("mix_name", mixNameRaw);
+  labelRaw = cleanExtraDashes("label", labelRaw);
 
   // Normalize everything
   const track_id = Number(trackIdStr);
-  const track_name = fixTrailingQuestionMarkOrApostrophe(unslug(trackNameRaw));
+
+  // Order matters:
+  // 1) unslug (converts hyphens to spaces and restores in-word apostrophes)
+  // 2) apply question-or-apostrophe on trailing underscores (title-level)
+  // 3) fix *word-final* underscores within the string → apostrophes (Em_, Dreamin_)
+  let track_title_pre = unslug(trackNameRaw);
+  track_title_pre = fixTrailingQuestionMarkOrApostrophe(track_title_pre);
+  const track_name = restoreWordFinalUnderscores(track_title_pre);
+
   const artists = unslug(artistsRaw);
-  const mix_name = unslug(mixNameRaw);
+  const mix_name = restoreWordFinalUnderscores(unslug(mixNameRaw));
   const label = unslug(labelRaw);
 
   const bpm = /^\d+$/.test(bpmRaw) ? Number(bpmRaw) : null;
   const musical_key = normalizeKey(keyRaw);
   const camelot_key = camelotForKey(musical_key);
 
-  const release_date = toIsoDate(releaseDateRaw);
-  const purchase_date = toIsoDate(purchaseDateRaw);
+  // Be tolerant when extracting the dates (handles extra dashes/strays)
+  const release_date = toIsoDateLoose(releaseDateRaw, "release_date");
+  const purchase_date = toIsoDateLoose(purchaseDateRaw, "purchase_date");
 
   return {
     track_id,

@@ -15,7 +15,7 @@ set -euo pipefail
 
 PROJECT_ID="${1:-dulcet-provider-474401-d3}"
 DATASET="${2:-chunes}"
-TABLE="${3:-tracks}"
+TABLE="${3:-tracks-2}"
 shift 3 || true
 
 NO_PROMPT=false
