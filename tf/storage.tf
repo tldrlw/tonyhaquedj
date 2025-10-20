@@ -55,7 +55,7 @@ resource "google_storage_bucket" "react_site" {
   # Website configuration (GCS website endpoints are HTTP only)
   website {
     main_page_suffix = "index.html"
-    not_found_page   = "404.html"
+    not_found_page   = "index.html"
   }
   # (Optional) Keep bucket tidy with versioning and lifecycle
   # versioning { enabled = true }
@@ -83,13 +83,12 @@ output "snapshots_bucket_name" {
 }
 
 output "snapshots_public_url_latest_manifest" {
-  description = "Convenience URL for the tiny manifest (we will write manifest/latest.json)."
   value       = "https://storage.googleapis.com/${google_storage_bucket.snapshots.name}/manifest/latest.json"
+  description = "Convenience URL for the tiny manifest (we will write manifest/latest.json)."
 }
 
-output "bucket_name" {
-  value       = google_storage_bucket.react_site.name
-  description = "Bucket name"
+output "google_storage_bucket_react_site_name" {
+  value = google_storage_bucket.react_site.name
 }
 
 output "website_root_url" {

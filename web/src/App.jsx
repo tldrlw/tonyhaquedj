@@ -138,17 +138,17 @@ export default function App() {
                 zIndex: 1,
               }}
             >
-              <th style={{ ...cellStyle, width: "90px" }}>id</th>
-              <th style={{ ...cellStyle, minWidth: "100px" }}>name</th>
-              <th style={{ ...cellStyle, minWidth: "100px" }}>artists</th>
-              <th style={{ ...cellStyle, minWidth: "120px" }}>mix</th>
-              <th style={{ ...cellStyle, minWidth: "120px" }}>label</th>
-              <th style={{ ...cellStyle, width: "80px" }}>bpm</th>
+              <th style={{ ...cellStyle, width: "70px" }}>id</th>
+              <th style={{ ...cellStyle, minWidth: "60px" }}>name</th>
+              <th style={{ ...cellStyle, minWidth: "80px" }}>artists</th>
+              <th style={{ ...cellStyle, minWidth: "150px" }}>mix</th>
+              <th style={{ ...cellStyle, minWidth: "240px" }}>label</th>
+              <th style={{ ...cellStyle, width: "60px" }}>bpm</th>
               <th style={{ ...cellStyle, width: "80px" }}>camelot 🗝</th>
               <th style={{ ...cellStyle, width: "80px" }}>musical 🗝</th>
               <th style={{ ...cellStyle, width: "100px" }}>released</th>
               <th style={{ ...cellStyle, width: "100px" }}>bought</th>
-              <th style={{ ...cellStyle, width: "100px" }}>size (mb)</th>
+              <th style={{ ...cellStyle, width: "80px" }}>size (mb)</th>
             </tr>
           </thead>
           <tbody>
@@ -157,7 +157,7 @@ export default function App() {
                 key={i}
                 style={{
                   borderTop: "1px solid #eee",
-                  backgroundColor: i % 2 === 0 ? "#99c9c1" : "white",
+                  backgroundColor: i % 2 === 0 ? "white" : "#99c9c1",
                 }}
               >
                 <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
