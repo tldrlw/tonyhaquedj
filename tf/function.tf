@@ -35,7 +35,6 @@ resource "google_cloudfunctions2_function" "main" {
       BQ_TABLE   = var.bq_table
     }
   }
-
   event_trigger {
     event_type            = "google.cloud.storage.object.v1.finalized"
     trigger_region        = var.region
@@ -63,7 +62,6 @@ resource "google_cloudfunctions2_function" "main" {
 resource "google_cloudfunctions2_function" "exporter" {
   name     = "export-snapshot"
   location = var.region
-
   build_config {
     runtime     = "nodejs20"
     entry_point = "exportSnapshot" # exported via index.js → exporter.js

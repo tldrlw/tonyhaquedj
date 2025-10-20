@@ -22,7 +22,6 @@ variable "func_name" {
 variable "exporter_invoker_user" {
   description = "User allowed to invoke the exporter function (the account you use with gcloud)."
   type        = string
-  default     = "tonyhaquedj@gmail.com" # <-- set this to your email
 }
 
 variable "bq_dataset" {
@@ -32,6 +31,6 @@ variable "bq_dataset" {
 
 variable "bq_table" {
   type        = string
-  default     = "tracks-2"
-  description = "change for wtv you want the cloud functions to use"
+  default     = "tracks"
+  description = "change to wtv you want the cloud functions to use, options are tracks/tracks-2"
 }
