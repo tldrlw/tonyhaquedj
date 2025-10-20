@@ -141,14 +141,14 @@ export default function App() {
               <th style={{ ...cellStyle, width: "90px" }}>id</th>
               <th style={{ ...cellStyle, minWidth: "100px" }}>name</th>
               <th style={{ ...cellStyle, minWidth: "100px" }}>artists</th>
-              <th style={{ ...cellStyle, minWidth: "100px" }}>mix</th>
+              <th style={{ ...cellStyle, minWidth: "120px" }}>mix</th>
               <th style={{ ...cellStyle, minWidth: "120px" }}>label</th>
               <th style={{ ...cellStyle, width: "80px" }}>bpm</th>
-              <th style={{ ...cellStyle, width: "100px" }}>camelot 🗝</th>
-              <th style={{ ...cellStyle, width: "100px" }}>musical 🗝</th>
-              <th style={{ ...cellStyle, width: "130px" }}>released</th>
-              <th style={{ ...cellStyle, width: "130px" }}>bought</th>
-              <th style={{ ...cellStyle, width: "120px" }}>size (mb)</th>
+              <th style={{ ...cellStyle, width: "80px" }}>camelot 🗝</th>
+              <th style={{ ...cellStyle, width: "80px" }}>musical 🗝</th>
+              <th style={{ ...cellStyle, width: "100px" }}>released</th>
+              <th style={{ ...cellStyle, width: "100px" }}>bought</th>
+              <th style={{ ...cellStyle, width: "100px" }}>size (mb)</th>
             </tr>
           </thead>
           <tbody>
