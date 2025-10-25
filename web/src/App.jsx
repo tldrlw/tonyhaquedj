@@ -1,14 +1,33 @@
+import Header from "./components/Header";
+import SubHeader from "./components/SubHeader";
+import Table from "./components/Table";
 import { useEffect, useState } from "react";
 
 const MANIFEST_URL =
   "https://storage.googleapis.com/chunes-snapshots-dulcet-provider-474401-d3-us-central1/manifest/latest.json";
 
+// Format date/time in US/Eastern (EST/EDT)
 function prettyDate(s) {
   try {
-    return new Date(s).toLocaleString();
+    return new Date(s).toLocaleString("en-US", {
+      timeZone: "America/New_York",
+    });
   } catch {
     return s;
   }
+}
+function prettyDateOnly(s) {
+  try {
+    return new Date(s).toLocaleDateString("en-US", {
+      timeZone: "America/New_York",
+    });
+  } catch {
+    return s ?? "";
+  }
+}
+function prettyMB(v) {
+  if (v == null) return "";
+  return typeof v === "number" ? v.toFixed(2) : v;
 }
 
 export default function App() {
@@ -16,182 +35,95 @@ export default function App() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
 
-  // ✅ Centralized padding for all table cells
-  const cellStyle = {
-    padding: "12px 20px",
-    verticalAlign: "middle",
+  const load = async () => {
+    setError("");
+    try {
+      const mRes = await fetch(MANIFEST_URL, { cache: "no-cache" });
+      if (!mRes.ok) throw new Error(`Manifest HTTP ${mRes.status}`);
+      const m = await mRes.json();
+      setManifest(m);
+
+      const sRes = await fetch(m.url, { cache: "no-cache" });
+      if (!sRes.ok) throw new Error(`Snapshot HTTP ${sRes.status}`);
+      const data = await sRes.json();
+
+      const sorted = [...data].sort((a, b) => {
+        const da = a.release_date ? new Date(a.release_date) : 0;
+        const db = b.release_date ? new Date(b.release_date) : 0;
+        return db - da;
+      });
+
+      setRows(sorted);
+    } catch (e) {
+      setError(String(e?.message || e));
+    }
   };
 
   useEffect(() => {
-    (async () => {
-      try {
-        // --- Fetch manifest ---
-        const mRes = await fetch(MANIFEST_URL, { cache: "no-cache" });
-        if (!mRes.ok) throw new Error(`Manifest HTTP ${mRes.status}`);
-        const m = await mRes.json();
-        setManifest(m);
-
-        // --- Fetch snapshot ---
-        const sRes = await fetch(m.url, { cache: "no-cache" });
-        if (!sRes.ok) throw new Error(`Snapshot HTTP ${sRes.status}`);
-        const data = await sRes.json();
-
-        // --- Sort by release_date (descending) ---
-        const sorted = [...data].sort((a, b) => {
-          const da = a.release_date ? new Date(a.release_date) : 0;
-          const db = b.release_date ? new Date(b.release_date) : 0;
-          return db - da;
-        });
-
-        setRows(sorted);
-      } catch (e) {
-        setError(String(e?.message || e));
-      }
-    })();
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (error) return <div style={{ padding: 16 }}>❌ {error}</div>;
-  if (!manifest || !rows) return <div style={{ padding: 16 }}>Loading…</div>;
+  if (error) {
+    return (
+      <div className="container py-4">
+        <div
+          className="alert alert-danger d-flex justify-content-between align-items-center"
+          role="alert"
+        >
+          <div>❌ {error}</div>
+          <button className="btn btn-sm btn-outline-dark" onClick={load}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!manifest || !rows) {
+    return (
+      <div className="container py-5 d-flex justify-content-center">
+        <div className="d-flex align-items-center gap-3">
+          <div
+            className="spinner-border"
+            role="status"
+            aria-hidden="true"
+          ></div>
+          <strong>Loading…</strong>
+        </div>
+      </div>
+    );
+  }
+
+  // Truncate helper (tooltip shows full text)
+  const Trunc = ({ text, max = "22ch" }) => (
+    <span
+      className="d-inline-block text-truncate align-middle"
+      style={{ maxWidth: max }}
+      title={text || ""}
+    >
+      {text || ""}
+    </span>
+  );
 
   return (
-    <div
-      style={{
-        fontFamily: "system-ui, sans-serif",
-        padding: 16,
-        lineHeight: 1.4,
-        maxWidth: "100%",
-      }}
-    >
-      <h2
-        style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px" }}
-      >
-        @tony_haque chunes
-        <a
-          href="https://instagram.com/tony_haque"
-          target="_blank"
-          rel="noreferrer"
-          style={{ display: "inline-flex", alignItems: "center" }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ color: "#E1306C" }}
-          >
-            <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-            <line x1="17.5" y1="6.5" x2="17.5" y2="6.5" />
-          </svg>
-        </a>
-        <a
-          href="https://www.tiktok.com/@tony_haque"
-          target="_blank"
-          rel="noreferrer"
-          style={{ display: "inline-flex", alignItems: "center" }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 256 256"
-            fill="currentColor"
-            style={{ color: "#000000" }}
-          >
-            <path d="M178.5 0c10.2 19.7 26.8 35.3 47.5 43.5V91c-21.7-0.2-42.4-6.5-60-17.7v82.7c0 55.5-45 100.5-100.5 100.5C29 256 0 227 0 191.5S29 127 65.5 127c4.5 0 8.9 0.3 13.2 1v45.3c-4.2-1.3-8.7-2-13.2-2-20.7 0-37.5 16.8-37.5 37.5s16.8 37.5 37.5 37.5c20.7 0 37.5-16.8 37.5-37.5V0h65.5z" />
-          </svg>
-        </a>
-      </h2>
-      <p style={{ marginTop: 8 }}>
-        <b>total:</b> {manifest.rowCount} &nbsp;|&nbsp;
-        <b>updated:</b> {prettyDate(manifest.updated)} EST &nbsp;|&nbsp;
-        <b>JSON</b>{" "}
-        <a href={manifest.url} target="_blank" rel="noreferrer">
-          snapshot
-        </a>
+    // ⬇️ Make the page a fluid canvas with **no side padding**
+    <div className="container-fluid px-0">
+      {/* Keep header/meta nicely centered */}
+      <Header />
+      <SubHeader
+        rowCount={manifest.rowCount}
+        updatedIso={manifest.updated}
+        snapshotUrl={manifest.url}
+      />
+      <Table rows={rows} prettyDateOnly={prettyDateOnly} prettyMB={prettyMB} />
+      {/* (Optional) tiny legend for very small screens */}
+      <p className="text-secondary small mt-2 px-3 mb-3">
+        <span className="d-inline d-sm-none">
+          On small screens, <b>mix</b> and <b>size</b> are hidden for
+          readability.
+        </span>
       </p>
-
-      {/* ✅ Responsive table container */}
-      <div style={{ overflowX: "auto", marginTop: 24 }}>
-        <table
-          style={{
-            borderCollapse: "separate",
-            borderSpacing: 0,
-            width: "100%",
-            minWidth: "1000px",
-            fontSize: "14px",
-            lineHeight: "1",
-          }}
-        >
-          <thead>
-            <tr
-              style={{
-                backgroundColor: "#ef4c40",
-                textAlign: "left",
-                position: "sticky",
-                top: 0,
-                zIndex: 1,
-              }}
-            >
-              <th style={{ ...cellStyle, width: "70px" }}>id</th>
-              <th style={{ ...cellStyle, minWidth: "60px" }}>name</th>
-              <th style={{ ...cellStyle, minWidth: "80px" }}>artists</th>
-              <th style={{ ...cellStyle, minWidth: "150px" }}>mix</th>
-              <th style={{ ...cellStyle, minWidth: "240px" }}>label</th>
-              <th style={{ ...cellStyle, width: "60px" }}>bpm</th>
-              <th style={{ ...cellStyle, width: "80px" }}>camelot 🗝</th>
-              <th style={{ ...cellStyle, width: "80px" }}>musical 🗝</th>
-              <th style={{ ...cellStyle, width: "100px" }}>released</th>
-              <th style={{ ...cellStyle, width: "100px" }}>bought</th>
-              <th style={{ ...cellStyle, width: "80px" }}>size (mb)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr
-                key={i}
-                style={{
-                  borderTop: "1px solid #eee",
-                  backgroundColor: i % 2 === 0 ? "white" : "#99c9c1",
-                }}
-              >
-                <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
-                  {r.track_id}
-                </td>
-                <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
-                  {r.track_name}
-                </td>
-                <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
-                  {r.artists}
-                </td>
-                <td style={cellStyle}>{r.mix_name}</td>
-                <td style={cellStyle}>{r.label}</td>
-                <td style={cellStyle}>{r.bpm ?? ""}</td>
-                <td style={cellStyle}>{r.camelot_key || ""}</td>
-                <td style={cellStyle}>{r.musical_key || ""}</td>
-                <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
-                  {r.release_date
-                    ? new Date(r.release_date).toLocaleDateString()
-                    : ""}
-                </td>
-                <td style={{ ...cellStyle, whiteSpace: "nowrap" }}>
-                  {r.purchase_date
-                    ? new Date(r.purchase_date).toLocaleDateString()
-                    : ""}
-                </td>
-                <td style={cellStyle}>
-                  {r.size?.toFixed ? r.size.toFixed(2) : r.size}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
