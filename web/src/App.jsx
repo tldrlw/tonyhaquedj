@@ -6,25 +6,18 @@ import { useEffect, useState } from "react";
 const MANIFEST_URL =
   "https://storage.googleapis.com/chunes-snapshots-dulcet-provider-474401-d3-us-central1/manifest/latest.json";
 
-// Format date/time in US/Eastern (EST/EDT)
 function prettyDate(s) {
   try {
-    return new Date(s).toLocaleString("en-US", {
-      timeZone: "America/New_York",
-    });
-  } catch {
-    return s;
-  }
-}
-function prettyDateOnly(s) {
-  try {
-    return new Date(s).toLocaleDateString("en-US", {
-      timeZone: "America/New_York",
+    const d = new Date(s);
+    // Force UTC formatting so midnight UTC stays "24" not "23"
+    return d.toLocaleDateString("en-US", {
+      timeZone: "UTC",
     });
   } catch {
     return s ?? "";
   }
 }
+
 function prettyMB(v) {
   if (v == null) return "";
   return typeof v === "number" ? v.toFixed(2) : v;
@@ -47,10 +40,16 @@ export default function App() {
       if (!sRes.ok) throw new Error(`Snapshot HTTP ${sRes.status}`);
       const data = await sRes.json();
 
+      // const sorted = [...data].sort((a, b) => {
+      //   const da = a.release_date ? new Date(a.release_date) : 0;
+      //   const db = b.release_date ? new Date(b.release_date) : 0;
+      //   return db - da;
+      // });
+
       const sorted = [...data].sort((a, b) => {
-        const da = a.release_date ? new Date(a.release_date) : 0;
-        const db = b.release_date ? new Date(b.release_date) : 0;
-        return db - da;
+        const nameA = a.track_name?.toLowerCase() || "";
+        const nameB = b.track_name?.toLowerCase() || "";
+        return nameA.localeCompare(nameB);
       });
 
       setRows(sorted);
@@ -116,7 +115,7 @@ export default function App() {
         updatedIso={manifest.updated}
         snapshotUrl={manifest.url}
       />
-      <Table rows={rows} prettyDateOnly={prettyDateOnly} prettyMB={prettyMB} />
+      <Table rows={rows} prettyDate={prettyDate} prettyMB={prettyMB} />
       {/* (Optional) tiny legend for very small screens */}
       <p className="text-secondary small mt-2 px-3 mb-3">
         <span className="d-inline d-sm-none">
