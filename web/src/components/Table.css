@@ -1,0 +1,14 @@
+.col-wide {
+  min-width: 22ch;
+  max-width: 22ch;
+}
+
+.col-narrow {
+  min-width: 8ch;
+  max-width: 8ch;
+}
+
+.col-narrow-date {
+  min-width: 9ch;
+  max-width: 9ch;
+}
