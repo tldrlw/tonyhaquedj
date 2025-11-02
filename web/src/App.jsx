@@ -30,8 +30,9 @@ export default function App() {
   const [rowsRaw, setRowsRaw] = useState(null);
   const [error, setError] = useState("");
   // "alpha" = alphabetical by track name
-  // "artist"  = sort by artist A→Z
+  // "artists"  = sort by artists A→Z
   // "camelot" = group/sort by Camelot key
+  // "bought" = newest purchase first
   const [viewMode, setViewMode] = useState("alpha");
 
   const load = async () => {

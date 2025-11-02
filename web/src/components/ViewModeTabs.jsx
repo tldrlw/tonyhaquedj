@@ -21,13 +21,13 @@ export default function ViewModeTabs({ viewMode, setViewMode }) {
       <div className="d-flex gap-2 small">
         <ViewModeButton
           mode="alpha"
-          label="A → Z"
+          label="a → z"
           viewMode={viewMode}
           setViewMode={setViewMode}
         />
         <ViewModeButton
-          mode="artist"
-          label="artist"
+          mode="artists"
+          label="artist(s)"
           viewMode={viewMode}
           setViewMode={setViewMode}
         />
@@ -37,19 +37,28 @@ export default function ViewModeTabs({ viewMode, setViewMode }) {
           viewMode={viewMode}
           setViewMode={setViewMode}
         />
+        <ViewModeButton
+          mode="bought"
+          label="bought"
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+        />
       </div>
 
       <div className="text-secondary small mt-2">
         {viewMode === "alpha" && (
-          <span>Sorted by track name (default crate view).</span>
+          <span>sorted by name - default crate view</span>
         )}
-        {viewMode === "artist" && (
-          <span>Sorted by artist name (useful for crate organization).</span>
+        {viewMode === "artists" && (
+          <span>sorted by artist(s) - useful for crate organization</span>
         )}
         {viewMode === "camelot" && (
           <span>
-            Grouped by camelot key, then BPM. Great for harmonic mixing.
+            grouped by camelot key - great for harmonic mixing
           </span>
+        )}
+        {viewMode === "bought" && (
+          <span>sorted by bought date - see your latest finds</span>
         )}
       </div>
     </div>

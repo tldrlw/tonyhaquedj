@@ -21,6 +21,16 @@ function parseCamelotKey(ck) {
   return { num: parseInt(m[1], 10), letter: m[2].toUpperCase() };
 }
 
+// safe timestamp → millis
+function tsToMillis(ts) {
+  // purchase_date is e.g. "2025-10-02T00:00:00.000Z"
+  // If it's missing/null, treat as 0 so it sorts last in desc
+  if (!ts) return 0;
+  const d = new Date(ts);
+  const ms = d.getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
 // ----- individual sorters -----
 
 export function sortByTrackName(rows) {
@@ -33,7 +43,7 @@ export function sortByTrackName(rows) {
 
 export function sortByArtist(rows) {
   return [...rows].sort((a, b) => {
-    // 1. artist A→Z
+    // 1. artists A→Z
     const artistA = safeLower(a.artists);
     const artistB = safeLower(b.artists);
     if (artistA !== artistB) {
@@ -81,6 +91,32 @@ export function sortByCamelot(rows) {
   });
 }
 
+// sort newest purchases first
+// so stuff you just bought is on top
+export function sortByPurchaseDate(rows) {
+  return [...rows].sort((a, b) => {
+    const pA = tsToMillis(a.purchase_date);
+    const pB = tsToMillis(b.purchase_date);
+
+    if (pA !== pB) {
+      return compareDesc(pA, pB); // newer first
+    }
+
+    // tie-breaker after same purchase timestamp:
+    // maybe show higher BPM first (party tracks up top)
+    const bpmA = a.bpm ?? 0;
+    const bpmB = b.bpm ?? 0;
+    if (bpmA !== bpmB) {
+      return compareAsc(bpmA, bpmB);
+    }
+
+    // final fallback so it's deterministic
+    const nameA = safeLower(a.track_name);
+    const nameB = safeLower(b.track_name);
+    return nameA.localeCompare(nameB);
+  });
+}
+
 // ----- main dispatcher -----
 
 export function getSortedRows(rows, viewMode) {
@@ -89,10 +125,12 @@ export function getSortedRows(rows, viewMode) {
   switch (viewMode) {
     case "alpha":
       return sortByTrackName(rows);
-    case "artist":
+    case "artists":
       return sortByArtist(rows);
     case "camelot":
       return sortByCamelot(rows);
+    case "bought":
+      return sortByPurchaseDate(rows);
     default:
       return rows;
   }
