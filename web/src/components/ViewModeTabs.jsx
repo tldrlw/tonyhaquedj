@@ -53,9 +53,7 @@ export default function ViewModeTabs({ viewMode, setViewMode }) {
           <span>sorted by artist(s) - useful for crate organization</span>
         )}
         {viewMode === "camelot" && (
-          <span>
-            grouped by camelot key - great for harmonic mixing
-          </span>
+          <span>grouped by camelot key - great for harmonic mixing</span>
         )}
         {viewMode === "bought" && (
           <span>sorted by bought date - see your latest finds</span>

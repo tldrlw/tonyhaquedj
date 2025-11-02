@@ -1,3 +1,4 @@
+import "./globals.css";
 import Header from "./components/Header";
 import SubHeader from "./components/SubHeader";
 import Table from "./components/Table";
@@ -90,17 +91,6 @@ export default function App() {
       </div>
     );
   }
-
-  // Truncate helper (tooltip shows full text)
-  const Trunc = ({ text, max = "22ch" }) => (
-    <span
-      className="d-inline-block text-truncate align-middle"
-      style={{ maxWidth: max }}
-      title={text || ""}
-    >
-      {text || ""}
-    </span>
-  );
 
   return (
     // ⬇️ Make the page a fluid canvas with **no side padding**

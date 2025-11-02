@@ -1,0 +1,5 @@
+@media (max-width: 576px) {
+  html, body {
+    font-size: 0.85rem !important;
+  }
+}

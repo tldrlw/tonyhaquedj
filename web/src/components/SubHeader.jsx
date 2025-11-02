@@ -19,7 +19,10 @@ export default function SubHeader({
     <div className="container">
       <p className="d-flex flex-column">
         <span>
-          updated: <mark>{prettyDate(updatedIso)} {timezoneLabel}</mark>
+          updated:{" "}
+          <mark>
+            {prettyDate(updatedIso)} {timezoneLabel}
+          </mark>
         </span>
         <span>
           <a
