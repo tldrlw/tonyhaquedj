@@ -21,11 +21,11 @@ export default function Table({ rows, prettyDate, prettyMB }) {
             </th>
             <th scope="col">name</th>
             <th scope="col">artists</th>
-            <th scope="col" style={{ width: "6ch", whiteSpace: "nowrap" }}>
-              bpm
-            </th>
             <th scope="col" style={{ width: "9ch", whiteSpace: "nowrap" }}>
               ck
+            </th>
+            <th scope="col" style={{ width: "6ch", whiteSpace: "nowrap" }}>
+              bpm
             </th>
             <th scope="col" style={{ width: "9ch", whiteSpace: "nowrap" }}>
               mk
@@ -60,8 +60,8 @@ export default function Table({ rows, prettyDate, prettyMB }) {
               <td>
                 <Trunc text={r.artists} max="26ch" />
               </td>
-              <td>{r.bpm ?? ""}</td>
               <td>{r.camelot_key || ""}</td>
+              <td>{r.bpm ?? ""}</td>
               <td>{r.musical_key || ""}</td>
               <td className="d-none d-sm-table-cell">
                 <Trunc text={r.mix_name} max="18ch" />

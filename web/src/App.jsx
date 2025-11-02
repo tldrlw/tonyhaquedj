@@ -1,6 +1,8 @@
 import Header from "./components/Header";
 import SubHeader from "./components/SubHeader";
 import Table from "./components/Table";
+import ViewModeTabs from "./components/ViewModeTabs";
+import { getSortedRows } from "./utils/sorters";
 import { useEffect, useState } from "react";
 
 const MANIFEST_URL =
@@ -25,8 +27,12 @@ function prettyMB(v) {
 
 export default function App() {
   const [manifest, setManifest] = useState(null);
-  const [rows, setRows] = useState(null);
+  const [rowsRaw, setRowsRaw] = useState(null);
   const [error, setError] = useState("");
+  // "alpha" = alphabetical by track name
+  // "artist"  = sort by artist A→Z
+  // "camelot" = group/sort by Camelot key
+  const [viewMode, setViewMode] = useState("alpha");
 
   const load = async () => {
     setError("");
@@ -40,19 +46,7 @@ export default function App() {
       if (!sRes.ok) throw new Error(`Snapshot HTTP ${sRes.status}`);
       const data = await sRes.json();
 
-      // const sorted = [...data].sort((a, b) => {
-      //   const da = a.release_date ? new Date(a.release_date) : 0;
-      //   const db = b.release_date ? new Date(b.release_date) : 0;
-      //   return db - da;
-      // });
-
-      const sorted = [...data].sort((a, b) => {
-        const nameA = a.track_name?.toLowerCase() || "";
-        const nameB = b.track_name?.toLowerCase() || "";
-        return nameA.localeCompare(nameB);
-      });
-
-      setRows(sorted);
+      setRowsRaw(data);
     } catch (e) {
       setError(String(e?.message || e));
     }
@@ -79,7 +73,9 @@ export default function App() {
     );
   }
 
-  if (!manifest || !rows) {
+  const sortedRows = getSortedRows(rowsRaw, viewMode);
+
+  if (!manifest || !rowsRaw) {
     return (
       <div className="container py-5 d-flex justify-content-center">
         <div className="d-flex align-items-center gap-3">
@@ -115,7 +111,8 @@ export default function App() {
         updatedIso={manifest.updated}
         snapshotUrl={manifest.url}
       />
-      <Table rows={rows} prettyDate={prettyDate} prettyMB={prettyMB} />
+      <ViewModeTabs viewMode={viewMode} setViewMode={setViewMode} />
+      <Table rows={sortedRows} prettyDate={prettyDate} prettyMB={prettyMB} />
       {/* (Optional) tiny legend for very small screens */}
       <p className="text-secondary small mt-2 px-3 mb-3">
         <span className="d-inline d-sm-none">
