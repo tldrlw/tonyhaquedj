@@ -3,6 +3,7 @@ import Header from "./components/Header";
 import SubHeader from "./components/SubHeader";
 import Table from "./components/Table";
 import ViewModeTabs from "./components/ViewModeTabs";
+import Charts from "./components/Charts";
 import { getSortedRows } from "./utils/sorters";
 import { useEffect, useState } from "react";
 
@@ -103,14 +104,12 @@ export default function App() {
         snapshotUrl={manifest.url}
       />
       <ViewModeTabs viewMode={viewMode} setViewMode={setViewMode} />
-      <Table rows={sortedRows} prettyDate={prettyDate} prettyMB={prettyMB} />
-      {/* (Optional) tiny legend for very small screens */}
-      <p className="text-secondary small mt-2 px-3 mb-3">
-        <span className="d-inline d-sm-none">
-          On small screens, <b>mix</b> and <b>size</b> are hidden for
-          readability.
-        </span>
-      </p>
+      {/* ⬇️ NEW: show the chart view instead of the table */}
+      {viewMode === "charts" ? (
+        <Charts rows={rowsRaw} />
+      ) : (
+        <Table rows={sortedRows} prettyDate={prettyDate} prettyMB={prettyMB} />
+      )}
     </div>
   );
 }

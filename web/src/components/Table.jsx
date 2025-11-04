@@ -108,6 +108,13 @@ export default function Table({ rows, prettyDate, prettyMB }) {
           ))}
         </tbody>
       </table>
+      {/* (Optional) tiny legend for very small screens */}
+      <p className="text-secondary small mt-2 mb-3">
+        <span className="d-inline d-sm-none">
+          On small screens, <b>mix</b> and <b>size</b> are hidden for
+          readability.
+        </span>
+      </p>
     </div>
   );
 }
