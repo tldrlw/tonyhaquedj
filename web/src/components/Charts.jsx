@@ -1,6 +1,6 @@
+import { useMemo } from "react";
 import Chart from "react-apexcharts";
 
-/** Order we want on the X-axis */
 const CAMELOT_ORDER = [
   "1A",
   "2A",
@@ -28,65 +28,92 @@ const CAMELOT_ORDER = [
   "12B",
 ];
 
-/** Build counts per camelot_key from your raw rows */
-function buildCounts(rows = []) {
+function toSeriesPoints(rows = []) {
   const counts = new Map(CAMELOT_ORDER.map((k) => [k, 0]));
   for (const r of rows) {
-    const k = r.camelot_key || r.camelotKey || r.camelot; // be flexible
+    const k = r.camelot_key ?? r.camelotKey ?? r.camelot;
     if (k && counts.has(k)) counts.set(k, counts.get(k) + 1);
   }
-  const labels = [];
-  const data = [];
-  for (const k of CAMELOT_ORDER) {
-    labels.push(k);
-    data.push(counts.get(k));
-  }
-  return { labels, data };
+  // [{ x: "1A", y: 12 }, ...] in correct order
+  return CAMELOT_ORDER.map((k) => ({ x: k, y: counts.get(k) }));
+}
+
+function tightMax(n) {
+  if (!n || n < 1) return 1;
+  const buffer = Math.max(1, Math.ceil(n * 0.02)); // ~2% pad, at least 1
+  return n + buffer; // hugs the tallest bar
+}
+
+// Optional: keep ticks integer & sensible
+function chooseTickAmount(xMax) {
+  // Use up to 6 ticks, but never more than the integer range
+  return Math.min(6, Math.max(2, Math.floor(xMax)));
 }
 
 export default function Charts({ rows }) {
-  const { labels, data } = buildCounts(rows);
+  const points = useMemo(() => toSeriesPoints(rows), [rows]);
+  const values = points.map((p) => p.y);
+  const maxSongs = Math.max(0, ...values);
+  const xMax = tightMax(maxSongs); // 👈 tighter cap
+  const tickAmt = chooseTickAmount(xMax);
+  const chartHeight = Math.max(520, points.length * 26);
 
   const options = {
     chart: { type: "bar", toolbar: { show: false } },
-    xaxis: { categories: labels, title: { text: "camelot key" } },
-    yaxis: { title: { text: "songs" }, min: 0, forceNiceScale: true },
+    plotOptions: {
+      bar: {
+        horizontal: true,
+        barHeight: "50%",
+        borderRadius: 4,
+      },
+    },
+    // Numeric axis across the bottom
+    xaxis: {
+      type: "numeric",
+      min: 0,
+      max: xMax, // no big round-up to 50
+      tickAmount: tickAmt, // avoids fractional ticks
+      title: { text: "" },
+      labels: { formatter: (v) => Math.round(v) }, // force integer tick labels
+    },
+    // Categories come from each point's `x` automatically
+    yaxis: {
+      title: { text: "" },
+      labels: { style: { fontSize: "12px" } },
+      // IMPORTANT: leave categories/tickAmount unset to avoid numeric scaling
+    },
     grid: { strokeDashArray: 3 },
     dataLabels: { enabled: false },
     tooltip: {
-      y: { formatter: (val) => `${val} song${val === 1 ? "" : "s"}` },
+      x: { formatter: (val) => String(val) }, // show the Camelot key
+      y: { formatter: (v) => `${v} song${v === 1 ? "" : "s"}` },
     },
+    colors: ["#5A8DEE"],
     legend: { show: false },
-    plotOptions: {
-      bar: {
-        borderRadius: 4,
-        columnWidth: "55%",
-      },
-    },
     responsive: [
       {
-        // Small screens: tighten columns and move tooltip if needed
         breakpoint: 576,
         options: {
-          plotOptions: { bar: { columnWidth: "70%" } },
+          plotOptions: { bar: { barHeight: "65%" } },
+          xaxis: { tickAmount: Math.min(4, xMax || 1) },
+          yaxis: { labels: { style: { fontSize: "11px" } } },
         },
       },
     ],
   };
 
-  const series = [{ name: "Songs", data }];
+  const series = [{ name: "Songs", data: points }];
 
   return (
     <div className="container mt-2">
       <div className="card p-3">
         <h5 className="card-title text-center mb-3">songs per camelot key</h5>
-        {/* width="100%" lets it fill Bootstrap columns responsively */}
         <Chart
           options={options}
           series={series}
           type="bar"
           width="100%"
-          height={360}
+          height={chartHeight}
         />
       </div>
     </div>

@@ -64,9 +64,7 @@ export default function ViewModeTabs({ viewMode, setViewMode }) {
         {viewMode === "bought" && (
           <span>sorted by bought date - my latest finds</span>
         )}
-        {viewMode === "charts" && (
-          <span>visual summary - songs per camelot key</span>
-        )}
+        {viewMode === "charts" && <span>song data visualizations</span>}
       </div>
     </div>
   );
