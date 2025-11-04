@@ -105,7 +105,7 @@ export default function Charts({ rows }) {
   const series = [{ name: "Songs", data: points }];
 
   return (
-    <div className="container mt-2">
+    <div className="container mt-2 mb-3">
       <div className="card p-3">
         <h5 className="card-title text-center mb-3">songs per camelot key</h5>
         <Chart
