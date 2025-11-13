@@ -39,7 +39,7 @@ export default function ViewModeTabs({ viewMode, setViewMode }) {
         />
         <ViewModeButton
           mode="bought"
-          label="bought"
+          label="latest"
           viewMode={viewMode}
           setViewMode={setViewMode}
         />
@@ -62,7 +62,7 @@ export default function ViewModeTabs({ viewMode, setViewMode }) {
           <span>grouped by camelot key - necessary for harmonic mixing</span>
         )}
         {viewMode === "bought" && (
-          <span>sorted by bought date - my latest finds</span>
+          <span>sorted by most recently bought - my latest finds</span>
         )}
         {viewMode === "charts" && <span>song data visualizations</span>}
       </div>
