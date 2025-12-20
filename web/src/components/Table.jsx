@@ -42,7 +42,7 @@ export default function Table({ rows, prettyDate, prettyMB }) {
     },
     {
       key: "label",
-      header: "label",
+      header: "label/notes",
       className: "col-wide",
       render: (r) => <Trunc text={r.label} />,
     },
@@ -67,7 +67,7 @@ export default function Table({ rows, prettyDate, prettyMB }) {
     },
     {
       key: "purchase_date",
-      header: "bought",
+      header: "downloaded",
       className: "col-narrow-date text-nowrap",
       render: (r) => (r.purchase_date ? prettyDate(r.purchase_date) : ""),
     },
