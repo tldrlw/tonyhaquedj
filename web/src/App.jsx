@@ -6,6 +6,7 @@ import ViewModeTabs from "./components/ViewModeTabs";
 import Charts from "./components/Charts";
 import { getSortedRows } from "./utils/sorters";
 import { useEffect, useState } from "react";
+import me from "./assets/me.jpg";
 
 const MANIFEST_URL =
   "https://storage.googleapis.com/chunes-snapshots-dulcet-provider-474401-d3-us-central1/manifest/latest.json";
@@ -97,13 +98,30 @@ export default function App() {
     // ⬇️ Make the page a fluid canvas with **no side padding**
     <div className="container-fluid px-0">
       {/* Keep header/meta nicely centered */}
-      <Header />
-      <SubHeader
-        rowCount={manifest.rowCount}
-        updatedIso={manifest.updated}
-        snapshotUrl={manifest.url}
-      />
-      <ViewModeTabs viewMode={viewMode} setViewMode={setViewMode} />
+      <div className="d-flex align-items-stretch container">
+        {/* LEFT: stacked header content */}
+        <div className="flex-grow-1">
+          <Header />
+          <SubHeader
+            rowCount={manifest.rowCount}
+            updatedIso={manifest.updated}
+            snapshotUrl={manifest.url}
+          />
+          <ViewModeTabs viewMode={viewMode} setViewMode={setViewMode} />
+        </div>
+        {/* RIGHT: image */}
+        <div className="d-none d-md-block">
+          <img
+            src={me}
+            alt="Tony Haque"
+            style={{
+              height: "100%",
+              width: "280px",
+              objectFit: "cover",
+            }}
+          />
+        </div>
+      </div>
       {/* ⬇️ NEW: show the chart view instead of the table */}
       {viewMode === "charts" ? (
         <Charts rows={rowsRaw} />

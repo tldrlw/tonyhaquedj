@@ -81,7 +81,7 @@ export default function Table({ rows, prettyDate, prettyMB }) {
   ];
 
   return (
-    <div className="table-responsive-md mt-2 px-2 px-md-3">
+    <div className="table-responsive-md px-2 px-md-3">
       <table className="table table-sm table-striped table-hover align-middle mb-0 w-100">
         <thead className="table-danger sticky-top" style={{ zIndex: 1 }}>
           <tr>

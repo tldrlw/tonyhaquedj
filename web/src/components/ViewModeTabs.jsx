@@ -16,7 +16,7 @@ function ViewModeButton({ mode, label, viewMode, setViewMode }) {
 
 export default function ViewModeTabs({ viewMode, setViewMode }) {
   return (
-    <div className="container mt-3">
+    <div className="mt-3">
       {/* <div className="d-flex gap-2 small"> */}
       <div className="d-flex flex-wrap gap-2 small">
         <ViewModeButton
