@@ -62,7 +62,7 @@ export default function ViewModeTabs({ viewMode, setViewMode }) {
           <span>grouped by camelot key - necessary for harmonic mixing</span>
         )}
         {viewMode === "bought" && (
-          <span>sorted by most recently downloaded/bought</span>
+          <span>sorted by most recently acquired</span>
         )}
         {viewMode === "charts" && <span>song data visualizations</span>}
       </div>
